@@ -1,0 +1,69 @@
+{
+  "error": {
+    "trace_id": "req-abc123",
+    "file": "services/discount.py",
+    "line": 9,
+    "function": "calculate",
+    "error": "AttributeError: 'NoneType' object has no attribute 'discount'"
+  },
+  "resolved_node": "services.discount.DiscountService.calculate",
+  "callers_chain": [
+    {
+      "qualname": "api.payment.PaymentService.pay",
+      "via_file": "services/discount.py",
+      "via_line": 6,
+      "resolved": true,
+      "from_runtime": true,
+      "callers": [
+        {
+          "qualname": "<entrypoint>",
+          "via_file": "api/payment.py",
+          "via_line": 6,
+          "resolved": true,
+          "from_runtime": true,
+          "callers": []
+        }
+      ]
+    }
+  ],
+  "callees_chain": [
+    {
+      "qualname": "repositories.promo.PromoRepository.__init__",
+      "file": "services/discount.py",
+      "line": 7,
+      "resolved": true,
+      "from_runtime": false,
+      "callees": []
+    },
+    {
+      "qualname": "repositories.promo.PromoRepository.get",
+      "file": "services/discount.py",
+      "line": 8,
+      "resolved": true,
+      "from_runtime": false,
+      "callees": [
+        {
+          "qualname": "_PROMO_DB.get",
+          "file": "repositories/promo.py",
+          "line": 13,
+          "resolved": false,
+          "from_runtime": false,
+          "callees": []
+        }
+      ]
+    },
+    {
+      "qualname": "repositories.promo.PromoRepository.get",
+      "file": "repositories/promo.py",
+      "line": 10,
+      "resolved": true,
+      "from_runtime": true,
+      "callees": []
+    }
+  ],
+  "root_cause_candidates": [
+    "repositories.promo.PromoRepository.__init__",
+    "_PROMO_DB.get",
+    "repositories.promo.PromoRepository.get"
+  ]
+}

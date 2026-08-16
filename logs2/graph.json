@@ -1,0 +1,87 @@
+{
+  "nodes": [
+    "<entrypoint>",
+    "_PROMO_DB.get",
+    "api.payment.PaymentService.pay",
+    "calculate",
+    "models.promo_model.Promo.__init__",
+    "repositories.promo.PromoRepository.__init__",
+    "repositories.promo.PromoRepository.get",
+    "services.discount.DiscountService.__init__",
+    "services.discount.DiscountService.calculate"
+  ],
+  "edges": [
+    {
+      "source": "api.payment.PaymentService.pay",
+      "target": "calculate",
+      "file": "api/payment.py",
+      "line": 7,
+      "resolved": false,
+      "reason": "unresolved",
+      "from_runtime": false
+    },
+    {
+      "source": "api.payment.PaymentService.pay",
+      "target": "services.discount.DiscountService.__init__",
+      "file": "api/payment.py",
+      "line": 7,
+      "resolved": true,
+      "reason": "constructor",
+      "from_runtime": false
+    },
+    {
+      "source": "repositories.promo.PromoRepository.get",
+      "target": "_PROMO_DB.get",
+      "file": "repositories/promo.py",
+      "line": 13,
+      "resolved": false,
+      "reason": "unresolved",
+      "from_runtime": false
+    },
+    {
+      "source": "services.discount.DiscountService.calculate",
+      "target": "repositories.promo.PromoRepository.__init__",
+      "file": "services/discount.py",
+      "line": 7,
+      "resolved": true,
+      "reason": "constructor",
+      "from_runtime": false
+    },
+    {
+      "source": "services.discount.DiscountService.calculate",
+      "target": "repositories.promo.PromoRepository.get",
+      "file": "services/discount.py",
+      "line": 8,
+      "resolved": true,
+      "reason": "local_type",
+      "from_runtime": false
+    },
+    {
+      "source": "<entrypoint>",
+      "target": "api.payment.PaymentService.pay",
+      "file": "api/payment.py",
+      "line": 6,
+      "resolved": true,
+      "reason": "runtime_trace",
+      "from_runtime": true
+    },
+    {
+      "source": "api.payment.PaymentService.pay",
+      "target": "services.discount.DiscountService.calculate",
+      "file": "services/discount.py",
+      "line": 6,
+      "resolved": true,
+      "reason": "runtime_trace",
+      "from_runtime": true
+    },
+    {
+      "source": "services.discount.DiscountService.calculate",
+      "target": "repositories.promo.PromoRepository.get",
+      "file": "repositories/promo.py",
+      "line": 10,
+      "resolved": true,
+      "reason": "runtime_trace",
+      "from_runtime": true
+    }
+  ]
+}
