@@ -1,6 +1,6 @@
 # Контекст для анализа ошибки
 
-Ошибка (из production-лога, trace_id=req-abc123): services/discount.py:9 в функции calculate()
+Ошибка (из production-лога, trace_id=req-abc123): services/discount.py:14 в функции calculate()
 ```
 AttributeError: 'NoneType' object has no attribute 'discount'
 ```
@@ -13,7 +13,7 @@ _нет исходника в индексе (внешний код / динам
 
 ### `api.payment.PaymentService.pay`
 уверенность источника: **runtime-confirmed**
-файл: `api/payment.py` (строки 6–8)
+файл: `api/payment.py` (строки 11–13)
 ```python
     def pay(self, order):
         discount = DiscountService().calculate(order)
@@ -22,7 +22,7 @@ _нет исходника в индексе (внешний код / динам
 
 ### `services.discount.DiscountService.calculate` ⬅ ЗДЕСЬ ПРОИЗОШЛА ОШИБКА
 уверенность источника: **error-location (подтверждено логом)**
-файл: `services/discount.py` (строки 6–9)
+файл: `services/discount.py` (строки 11–14)
 ```python
     def calculate(self, order):
         repo = PromoRepository()
@@ -36,7 +36,7 @@ _нет исходника в индексе (внешний код / динам
 
 ### `repositories.promo.PromoRepository.get`
 уверенность источника: **static-resolved**
-файл: `repositories/promo.py` (строки 10–13)
+файл: `repositories/promo.py` (строки 15–18)
 ```python
     def get(self, code):
         # Баг: если промокода нет в базе, возвращается None вместо

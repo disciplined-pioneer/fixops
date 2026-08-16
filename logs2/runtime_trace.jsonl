@@ -1,3 +1,0 @@
-{"trace_id": "req-abc123", "caller": "<entrypoint>", "callee": "api.payment.PaymentService.pay", "file": "api/payment.py", "line": 6, "ts": 1786891616.493806}
-{"trace_id": "req-abc123", "caller": "api.payment.PaymentService.pay", "callee": "services.discount.DiscountService.calculate", "file": "services/discount.py", "line": 6, "ts": 1786891616.493806}
-{"trace_id": "req-abc123", "caller": "services.discount.DiscountService.calculate", "callee": "repositories.promo.PromoRepository.get", "file": "repositories/promo.py", "line": 10, "ts": 1786891616.493806}

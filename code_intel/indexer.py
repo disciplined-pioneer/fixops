@@ -19,6 +19,11 @@ indexer.py — AST-индексатор проекта.
 
 Результат — плоский индекс в JSON-совместимой структуре, который
 дальше используется resolver.py и graph.py.
+
+Логика собрана в класс `ProjectIndexer`: один экземпляр индексирует
+проект (сканирование + AST-разбор + экспорт в dict). Для обратной
+совместимости сохранены модульные функции-обёртки `scan_project`,
+`index_file` и `to_dict`.
 """
 
 from __future__ import annotations
@@ -67,30 +72,122 @@ class ModuleInfo:
     functions: list = field(default_factory=list)        # list[FunctionInfo] (top-level и методы)
 
 
-def _file_to_module(root: str, path: str) -> str:
-    rel = os.path.relpath(path, root)
-    rel = rel[:-3] if rel.endswith(".py") else rel
-    return rel.replace(os.sep, ".")
+class ProjectIndexer:
+    """AST-индексатор проекта: сканирует каталог и строит список ModuleInfo."""
 
+    IGNORE_DIRS = (".git", "__pycache__", "venv", ".venv", "node_modules")
 
-def _dotted_call_name(node: ast.AST) -> tuple[str, Optional[str], Optional[str]]:
-    """Возвращает (raw_text, base, attr) для узла вызываемого выражения."""
-    if isinstance(node, ast.Name):
-        return node.id, None, node.id
-    if isinstance(node, ast.Attribute):
-        parts = []
-        cur = node
-        while isinstance(cur, ast.Attribute):
-            parts.append(cur.attr)
-            cur = cur.value
-        if isinstance(cur, ast.Name):
-            parts.append(cur.id)
-        parts.reverse()
-        raw = ".".join(parts)
-        base = ".".join(parts[:-1]) if len(parts) > 1 else None
-        attr = parts[-1]
-        return raw, base, attr
-    return ast.dump(node), None, None
+    @staticmethod
+    def _file_to_module(root: str, path: str) -> str:
+        rel = os.path.relpath(path, root)
+        rel = rel[:-3] if rel.endswith(".py") else rel
+        return rel.replace(os.sep, ".")
+
+    @staticmethod
+    def _dotted_call_name(node: ast.AST) -> tuple[str, Optional[str], Optional[str]]:
+        """Возвращает (raw_text, base, attr) для узла вызываемого выражения."""
+        if isinstance(node, ast.Name):
+            return node.id, None, node.id
+        if isinstance(node, ast.Attribute):
+            parts = []
+            cur = node
+            while isinstance(cur, ast.Attribute):
+                parts.append(cur.attr)
+                cur = cur.value
+            if isinstance(cur, ast.Name):
+                parts.append(cur.id)
+            parts.reverse()
+            raw = ".".join(parts)
+            base = ".".join(parts[:-1]) if len(parts) > 1 else None
+            attr = parts[-1]
+            return raw, base, attr
+        return ast.dump(node), None, None
+
+    def scan(self, root: str, ignore_dirs: tuple = IGNORE_DIRS) -> list[ModuleInfo]:
+        """Проходит по проекту и индексирует каждый .py файл. Это и есть шаг 1 —
+        построение индекса без чтения всего проекта в контекст модели целиком."""
+        modules = []
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in ignore_dirs]
+            for fn in filenames:
+                if fn.endswith(".py"):
+                    full = os.path.join(dirpath, fn)
+                    try:
+                        modules.append(self.index_file(root, full))
+                    except SyntaxError:
+                        continue
+        return modules
+
+    def index_file(self, root: str, path: str) -> ModuleInfo:
+        with open(path, "r", encoding="utf-8") as f:
+            source = f.read()
+        tree = ast.parse(source, filename=path)
+
+        mod = ModuleInfo(
+            file=os.path.relpath(path, root).replace(os.sep, "/"),
+            module=self._file_to_module(root, path),
+        )
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    mod.imports.append({"module": alias.name, "asname": alias.asname, "kind": "import"})
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                for alias in node.names:
+                    mod.imports.append({
+                        "module": module,
+                        "name": alias.name,
+                        "asname": alias.asname,
+                        "kind": "from",
+                    })
+
+        # top-level functions
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                mod.functions.append(self._index_function(node, mod.module, is_method=False, class_name=None))
+            elif isinstance(node, ast.ClassDef):
+                cls = ClassInfo(name=node.name, lineno=node.lineno,
+                                 bases=[b.id for b in node.bases if isinstance(b, ast.Name)])
+                for item in node.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        cls.methods.append(item.name)
+                        mod.functions.append(
+                            self._index_function(item, mod.module, is_method=True, class_name=node.name)
+                        )
+                mod.classes.append(cls)
+
+        return mod
+
+    def _index_function(self, node, module: str, is_method: bool, class_name: Optional[str]) -> FunctionInfo:
+        qualname = f"{module}.{class_name}.{node.name}" if class_name else f"{module}.{node.name}"
+        fv = _FunctionVisitor()
+        for stmt in node.body:
+            fv.visit(stmt)
+        return FunctionInfo(
+            name=node.name,
+            qualname=qualname,
+            lineno=node.lineno,
+            end_lineno=getattr(node, "end_lineno", node.lineno),
+            is_method=is_method,
+            class_name=class_name,
+            calls=fv.calls,
+            local_types=fv.local_types,
+        )
+
+    def to_dict(self, modules: list[ModuleInfo]) -> dict:
+        return {
+            "modules": [
+                {
+                    "file": m.file,
+                    "module": m.module,
+                    "imports": m.imports,
+                    "classes": [asdict(c) for c in m.classes],
+                    "functions": [asdict(fn) | {"calls": [asdict(c) for c in fn.calls]} for fn in m.functions],
+                }
+                for m in modules
+            ]
+        }
 
 
 class _FunctionVisitor(ast.NodeVisitor):
@@ -103,7 +200,7 @@ class _FunctionVisitor(ast.NodeVisitor):
     def visit_Assign(self, node: ast.Assign):
         # x = ClassName(...)  -> запоминаем предполагаемый тип x
         if isinstance(node.value, ast.Call):
-            raw, base, attr = _dotted_call_name(node.value.func)
+            raw, base, attr = ProjectIndexer._dotted_call_name(node.value.func)
             if attr and attr[0].isupper():  # эвристика: похоже на конструктор класса
                 for target in node.targets:
                     if isinstance(target, ast.Name):
@@ -111,7 +208,7 @@ class _FunctionVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Call(self, node: ast.Call):
-        raw, base, attr = _dotted_call_name(node.func)
+        raw, base, attr = ProjectIndexer._dotted_call_name(node.func)
         if base == "self":
             kind = "self_attr"
         elif base is None and attr is not None and raw == attr:
@@ -124,91 +221,16 @@ class _FunctionVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+def scan_project(root: str, ignore_dirs: tuple = ProjectIndexer.IGNORE_DIRS) -> list[ModuleInfo]:
+    """Обратно-совместимая обёртка над ProjectIndexer.scan."""
+    return ProjectIndexer().scan(root, ignore_dirs)
+
+
 def index_file(root: str, path: str) -> ModuleInfo:
-    with open(path, "r", encoding="utf-8") as f:
-        source = f.read()
-    tree = ast.parse(source, filename=path)
-
-    mod = ModuleInfo(
-        file=os.path.relpath(path, root).replace(os.sep, "/"),
-        module=_file_to_module(root, path),
-    )
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                mod.imports.append({"module": alias.name, "asname": alias.asname, "kind": "import"})
-        elif isinstance(node, ast.ImportFrom):
-            module = node.module or ""
-            for alias in node.names:
-                mod.imports.append({
-                    "module": module,
-                    "name": alias.name,
-                    "asname": alias.asname,
-                    "kind": "from",
-                })
-
-    # top-level functions
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            mod.functions.append(_index_function(node, mod.module, is_method=False, class_name=None))
-        elif isinstance(node, ast.ClassDef):
-            cls = ClassInfo(name=node.name, lineno=node.lineno,
-                             bases=[b.id for b in node.bases if isinstance(b, ast.Name)])
-            for item in node.body:
-                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    cls.methods.append(item.name)
-                    mod.functions.append(
-                        _index_function(item, mod.module, is_method=True, class_name=node.name)
-                    )
-            mod.classes.append(cls)
-
-    return mod
-
-
-def _index_function(node, module: str, is_method: bool, class_name: Optional[str]) -> FunctionInfo:
-    qualname = f"{module}.{class_name}.{node.name}" if class_name else f"{module}.{node.name}"
-    fv = _FunctionVisitor()
-    for stmt in node.body:
-        fv.visit(stmt)
-    return FunctionInfo(
-        name=node.name,
-        qualname=qualname,
-        lineno=node.lineno,
-        end_lineno=getattr(node, "end_lineno", node.lineno),
-        is_method=is_method,
-        class_name=class_name,
-        calls=fv.calls,
-        local_types=fv.local_types,
-    )
-
-
-def scan_project(root: str, ignore_dirs=(".git", "__pycache__", "venv", ".venv", "node_modules")) -> list[ModuleInfo]:
-    """Проходит по проекту и индексирует каждый .py файл. Это и есть шаг 1 —
-    построение индекса без чтения всего проекта в контекст модели целиком."""
-    modules = []
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in ignore_dirs]
-        for fn in filenames:
-            if fn.endswith(".py"):
-                full = os.path.join(dirpath, fn)
-                try:
-                    modules.append(index_file(root, full))
-                except SyntaxError:
-                    continue
-    return modules
+    """Обратно-совместимая обёртка над ProjectIndexer.index_file."""
+    return ProjectIndexer().index_file(root, path)
 
 
 def to_dict(modules: list[ModuleInfo]) -> dict:
-    return {
-        "modules": [
-            {
-                "file": m.file,
-                "module": m.module,
-                "imports": m.imports,
-                "classes": [asdict(c) for c in m.classes],
-                "functions": [asdict(fn) | {"calls": [asdict(c) for c in fn.calls]} for fn in m.functions],
-            }
-            for m in modules
-        ]
-    }
+    """Обратно-совместимая обёртка над ProjectIndexer.to_dict."""
+    return ProjectIndexer().to_dict(modules)

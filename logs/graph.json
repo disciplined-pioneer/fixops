@@ -15,7 +15,7 @@
       "source": "api.payment.PaymentService.pay",
       "target": "calculate",
       "file": "api/payment.py",
-      "line": 7,
+      "line": 12,
       "resolved": false,
       "reason": "unresolved",
       "from_runtime": false
@@ -24,7 +24,7 @@
       "source": "api.payment.PaymentService.pay",
       "target": "services.discount.DiscountService.__init__",
       "file": "api/payment.py",
-      "line": 7,
+      "line": 12,
       "resolved": true,
       "reason": "constructor",
       "from_runtime": false
@@ -33,7 +33,7 @@
       "source": "repositories.promo.PromoRepository.get",
       "target": "_PROMO_DB.get",
       "file": "repositories/promo.py",
-      "line": 13,
+      "line": 18,
       "resolved": false,
       "reason": "unresolved",
       "from_runtime": false
@@ -42,7 +42,7 @@
       "source": "services.discount.DiscountService.calculate",
       "target": "repositories.promo.PromoRepository.__init__",
       "file": "services/discount.py",
-      "line": 7,
+      "line": 12,
       "resolved": true,
       "reason": "constructor",
       "from_runtime": false
@@ -51,7 +51,7 @@
       "source": "services.discount.DiscountService.calculate",
       "target": "repositories.promo.PromoRepository.get",
       "file": "services/discount.py",
-      "line": 8,
+      "line": 13,
       "resolved": true,
       "reason": "local_type",
       "from_runtime": false
@@ -60,7 +60,7 @@
       "source": "<entrypoint>",
       "target": "api.payment.PaymentService.pay",
       "file": "api/payment.py",
-      "line": 6,
+      "line": 7,
       "resolved": true,
       "reason": "runtime_trace",
       "from_runtime": true
@@ -69,7 +69,7 @@
       "source": "api.payment.PaymentService.pay",
       "target": "services.discount.DiscountService.calculate",
       "file": "services/discount.py",
-      "line": 6,
+      "line": 7,
       "resolved": true,
       "reason": "runtime_trace",
       "from_runtime": true
@@ -78,7 +78,7 @@
       "source": "services.discount.DiscountService.calculate",
       "target": "repositories.promo.PromoRepository.get",
       "file": "repositories/promo.py",
-      "line": 10,
+      "line": 11,
       "resolved": true,
       "reason": "runtime_trace",
       "from_runtime": true

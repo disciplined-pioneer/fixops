@@ -20,6 +20,11 @@ tracer.py — runtime-трассировка вызовов (шаг 7.3).
 Технически используется sys.settrace: перехватываются события "call"
 для функций, определённых внутри project_root, и строится реальная
 цепочка caller -> callee с номером строки вызова.
+
+Через параметр `ignore_modules` можно исключить кадры инфраструктуры
+(например "core.logging" / "core.decorators" — логирование приложения),
+чтобы они не засоряли граф. При определении вызывающего такие кадры
+пропускаются: вызывающий ищется выше по стеку.
 """
 
 from __future__ import annotations
@@ -33,9 +38,12 @@ from contextlib import contextmanager
 
 
 class RuntimeTracer:
-    def __init__(self, project_root: str, log_path: str | None = None):
+    def __init__(self, project_root: str, log_path: str | None = None, ignore_modules: set | None = None):
         self.project_root = os.path.abspath(project_root)
         self.log_path = log_path
+        # Модули (по dotted-пути), кадры которых не попадают в трейс —
+        # например "core.logging" / "core.decorators" из инфраструктуры логирования.
+        self.ignore_modules: set = set(ignore_modules or ())
         self.events: list[dict] = []
         self._stack: list[dict] = []
         self._trace_id: str | None = None
@@ -49,6 +57,8 @@ class RuntimeTracer:
             return None  # игнорируем стандартную библиотеку / сторонние пакеты
         rel = os.path.relpath(filename, self.project_root)
         module = rel[:-3].replace(os.sep, ".") if rel.endswith(".py") else rel
+        if any(module.startswith(ignored) for ignored in self.ignore_modules):
+            return None  # кадры инфраструктуры логирования не трейсим
 
         func_name = frame.f_code.co_name
         # пытаемся понять, метод ли это класса, по self/cls в локалах
@@ -61,12 +71,23 @@ class RuntimeTracer:
             return f"{module}.{cls_name}.{func_name}"
         return f"{module}.{func_name}"
 
+    def _nearest_caller_qualname(self, frame):
+        """Поднимается по стеку вызовов вверх, пропуская игнорируемые кадры
+        (например инфраструктуру логирования core.decorators/core.logging),
+        и возвращает qualname ближайшего трейсуемого вызывающего."""
+        caller = frame.f_back
+        while caller is not None:
+            caller_q = self._qualname_for_frame(caller)
+            if caller_q is not None:
+                return caller_q
+            caller = caller.f_back
+        return None
+
     def _trace_calls(self, frame, event, arg):
         if event == "call":
             callee_q = self._qualname_for_frame(frame)
             if callee_q is not None:
-                caller_frame = frame.f_back
-                caller_q = self._qualname_for_frame(caller_frame) if caller_frame else None
+                caller_q = self._nearest_caller_qualname(frame)
                 caller_q = caller_q or "<entrypoint>"
                 self.events.append({
                     "trace_id": self._trace_id,
