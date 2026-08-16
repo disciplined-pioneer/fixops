@@ -1,3 +1,5 @@
+from sample_app.core.decorators import log_execution
+from sample_app.core.logging import get_logger
 from models.product import Product
 
 _INVENTORY_DB = {
@@ -7,8 +9,15 @@ _INVENTORY_DB = {
 
 
 class InventoryRepository:
+    @log_execution(event="inventory.get")
     def get(self, sku):
         # Баг: для неизвестного SKU метод возвращает None вместо понятной
         # ошибки. Ниже по стеку (в PricingService.calculate_total) это
         # всплывёт как AttributeError: 'NoneType' object has no attribute 'price'.
-        return _INVENTORY_DB.get(sku)
+        log = get_logger(event="inventory.get", sku=sku)
+        product = _INVENTORY_DB.get(sku)
+        if product is None:
+            log.warning("SKU not found, returning None")
+        else:
+            log.debug("SKU resolved", price=product.price)
+        return product

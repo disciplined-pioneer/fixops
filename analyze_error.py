@@ -2,17 +2,19 @@
 analyze_error.py — статический анализ ошибки по графу вызовов проекта.
 
 Пути вписываются прямо в код ниже (блок КОНФИГУРАЦИЯ): путь к корню
-проекта и путь к файлу с логом ошибки. Запуск обычный:
+проекта и путь к файлу с логами. Запуск обычный:
 
     python analyze_error.py
 
 Скрипт:
+  - читает лог-файл проекта (<корень проекта>/logs/app.log) и из последней
+    ERROR-записи достаёт ошибку в формате {file, line, function, error};
   - индексирует проект (AST, без выполнения кода);
   - строит граф вызовов;
   - находит узел ошибки и раскладывает его на цепочку callers/callees;
   - собирает финальный промпт для LLM с реальным исходным кодом функций.
 
-Все артефакты, как в demo.py, складываются в каталог логов проекта (LOGS_DIR):
+Все артефакты, как в demo.py, складываются в каталог логов пайплайна (LOGS_DIR):
   - index.json               — AST-индекс проекта
   - graph.json               — граф вызовов (для визуализации)
   - last_error_analysis.json — цепочка/координаты ошибки
@@ -41,28 +43,69 @@ from code_intel.html_view import save_html_view                 # noqa: E402
 # КОНФИГУРАЦИЯ — впишите сюда свой проект и лог ошибки
 # =====================================================================
 PROJECT_PATH = os.path.join(_REPO_ROOT, "sample_app")          # корень анализируемого проекта
-ERROR_LOG_PATH = os.path.join(_REPO_ROOT, "sample_app", "errors", "error.json")
+ERROR_LOG_PATH = os.path.join(_REPO_ROOT, "sample_app", "logs", "app.log")  # лог-файл проекта
 LOGS_DIR = os.path.join(_REPO_ROOT, "logs")                     # сюда складываются все артефакты анализа
 EXTRA_IGNORE_DIRS: tuple = ()                                  # доп. каталоги, исключаемые из индексации (напр. ("core",))
+LOG_TAIL_LINES = 50                                            # сколько последних строк лога читаем
 # =====================================================================
 
-REQUIRED_ERROR_KEYS = ("file", "function")
+REQUIRED_ERROR_KEYS = ("file", "function", "line", "error")
 
 
 class ErrorLoader:
-    """Читает лог ошибки из JSON-файла и проверяет обязательные поля."""
+    """Читает последнюю ERROR-запись из хвоста лог-файла проекта (loguru, serialize=True).
+
+    Читаются не все строки, а только последние LOG_TAIL_LINES — ошибка почти
+    всегда в конце лога. Формат строки — JSON:
+    {"text": ..., "record": {"level": {...}, "extra": {...}}}.
+    Из extra последней ERROR-записи (checkout failed в reproduce.py) достаются
+    координаты ошибки: file / line / function / error.
+    """
 
     @staticmethod
-    def from_file(path: str) -> dict:
-        with open(path, "r", encoding="utf-8") as f:
-            error_log = json.load(f)
-        missing = [k for k in REQUIRED_ERROR_KEYS if not error_log.get(k)]
-        if missing:
-            raise ValueError(
-                f"В логе ошибки не хватает обязательных полей: {missing}. "
-                f"Нужны минимум: {list(REQUIRED_ERROR_KEYS)}"
-            )
-        return error_log
+    def _tail(path: str, n: int) -> list[str]:
+        """Читает последние n строк файла, не загружая его целиком."""
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            block = 8192
+            data = b""
+            while size > 0 and data.count(b"\n") <= n:
+                read = min(block, size)
+                size -= read
+                f.seek(size)
+                data = f.read(read) + data
+        return [
+            ln.decode("utf-8", errors="replace")
+            for ln in data.splitlines()[-n:]
+        ]
+
+    @staticmethod
+    def from_file(path: str, tail: int = LOG_TAIL_LINES) -> dict:
+        lines = ErrorLoader._tail(path, tail)
+        if not lines:
+            raise ValueError(f"Лог-файл пуст: {path}")
+
+        for raw in reversed(lines):
+            try:
+                record = json.loads(raw).get("record", {})
+            except json.JSONDecodeError:
+                continue  # не-json строка (например, обрыв записи) — пропускаем
+            level = (record.get("level") or {}).get("name")
+            extra = record.get("extra") or {}
+            if level == "ERROR" and all(extra.get(k) is not None for k in REQUIRED_ERROR_KEYS):
+                return {
+                    "file": extra["file"],
+                    "line": int(extra["line"]),
+                    "function": extra["function"],
+                    "error": extra["error"],
+                }
+
+        raise ValueError(
+            f"В последних {tail} строках лога {path} не найдено ERROR-записи "
+            f"с координатами ошибки ({', '.join(REQUIRED_ERROR_KEYS)}). "
+            f"Запустите python sample_app/reproduce.py или увеличьте LOG_TAIL_LINES"
+        )
 
 
 class AnalyzeJob:
@@ -149,7 +192,8 @@ def main() -> int:
         sys.stderr.write(f"Не найдена папка проекта: {PROJECT_PATH}\n")
         return 2
     if not os.path.isfile(ERROR_LOG_PATH):
-        sys.stderr.write(f"Не найден файл с логом ошибки: {ERROR_LOG_PATH}\n")
+        sys.stderr.write(f"Не найден лог-файл проекта: {ERROR_LOG_PATH}\n")
+        sys.stderr.write("Сначала запустите: python sample_app/reproduce.py\n")
         return 2
 
     try:
