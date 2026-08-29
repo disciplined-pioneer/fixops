@@ -172,12 +172,8 @@ class AnalyzeJob:
             print(result["message"])
             return 1
 
-        print(ErrorAnalyzer.render_chain_text(result))
-
-        print("\n" + "=" * 70)
-        print("ПРОМПТ ДЛЯ LLM")
-        print("=" * 70)
-        print(artifacts.get("prompt", ""))
+        # print(ErrorAnalyzer.render_chain_text(result))
+        # print(artifacts.get("prompt", ""))
 
         saved = [os.path.join(self.logs_dir, name) for name in
                  ("index.json", "graph.json", "last_error_analysis.json",
