@@ -24,6 +24,7 @@ import os
 import sys
 import json
 import asyncio
+from pathlib import Path
 
 from config import settings
 from code_intel.html_view import save_html_view
@@ -175,7 +176,9 @@ async def main() -> int:
 
     project_path = "sample_app"
 
-    project_root = os.path.abspath(project_path)
+    base_dir = Path(__file__).resolve().parent.parent
+    project_root = str(base_dir / project_path)
+
     error_log_path = os.path.join(project_root, "logs", "app.log")
     logs_dir = os.path.join(project_root, ".fixops")
 
