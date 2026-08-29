@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  fixops:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fixops
+    restart: always
+
+    # Загружаем секреты из файла .env в этой же папке
+    env_file:
+      - .env
+
+    environment:
+      - WORKSPACE_DIR=/workspace
+      # Значение подтянется из .env файла
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+
+    volumes:
+      # 1. Доступ к Docker Daemon сервера (для чтения логов ВСЕХ контейнеров на сервере)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # 2. Доступ к исходному коду всех проектов на чтение и запись
+      # Левая часть — путь на сервере, правая — внутри контейнера FixOps
+      - /home/ubuntu/projects:/workspace
+
+      # 3. SSH-ключи сервера для аутентификации в GitHub/GitLab при push
+      - ~/.ssh:/root/.ssh:ro
+
+    networks:
+      - fixops-net
+
+networks:
+  fixops-net:
+    driver: bridge

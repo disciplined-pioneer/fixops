@@ -23,8 +23,6 @@ analyze_error.py — статический анализ ошибки по гр�
 import os
 import sys
 import json
-import argparse
-from pathlib import Path
 
 from config import settings
 from code_intel.html_view import save_html_view
@@ -147,7 +145,6 @@ class AnalyzeJob:
 
     def run(self) -> int:
 
-        Path("sandbox").mkdir(exist_ok=True) # папка для редактирования
         artifacts = self.analyze()
         result = artifacts["analysis"]
 
@@ -170,11 +167,12 @@ class AnalyzeJob:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Анализ ошибки проекта.")
-    parser.add_argument("project", nargs="?", default="sample_app", help="Имя проекта в папке sandbox (по умолчанию: sample_app)")
-    args = parser.parse_args()
+    # --- КОНФИГУРАЦИЯ ---
+    # Укажите здесь путь к папке проекта, который нужно проанализировать
+    project_path = "sample_app"
+    # --------------------
 
-    project_root = os.path.join("sandbox", args.project)
+    project_root = os.path.abspath(project_path)
     error_log_path = os.path.join(project_root, "logs", "app.log")
     logs_dir = os.path.join(project_root, ".fixops")
 

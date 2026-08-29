@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # =========================================================
+  # 1. ОСНОВНОЙ ВЕБ-СЕРВИС (FixOps его ОТСЛЕЖИВАЕТ)
+  # =========================================================
+  web-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: my-app-web-api
+    restart: always
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env
+
+    depends_on:
+      - postgres-db
+      - redis-cache
+
+    labels:
+      # Разрешение для FixOps отслеживать логи этого контейнера
+      - "fixops.enabled=true"
+      # Имя папки проекта внутри /home/ubuntu/projects (относительно /workspace в FixOps)
+      - "fixops.project_folder=my-app"
+
+  # =========================================================
+  # 2. ФОНОВЫЙ ВОРКЕР (FixOps его ТОЖЕ ОТСЛЕЖИВАЕТ)
+  # =========================================================
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: my-app-celery-worker
+    command: celery -A app.worker worker --loglevel=info
+    restart: always
+
+    depends_on:
+      - redis-cache
+
+    labels:
+      # Этот контейнер тоже в целевой папке my-app, его логи тоже проверяем
+      - "fixops.enabled=true"
+      - "fixops.project_folder=my-app"
+
+  # =========================================================
+  # 3. БАЗА ДАННЫХ (FixOps ее ИГНОРИРУЕТ)
+  # =========================================================
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: my-app-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: app_db
+      POSTGRES_USER: db_user
+      POSTGRES_PASSWORD: db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Метки fixops.enabled НЕТ — FixOps этот контейнер пропустит
+
+  # =========================================================
+  # 4. РЕДИС КЭШ (FixOps его ИГНОРИРУЕТ)
+  # =========================================================
+  redis-cache:
+    image: redis:7-alpine
+    container_name: my-app-redis
+    restart: always
+    # Метки fixops.enabled НЕТ — FixOps этот контейнер пропустит
+
+volumes:
+  pgdata:
