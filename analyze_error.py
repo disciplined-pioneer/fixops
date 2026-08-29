@@ -130,6 +130,7 @@ class AnalyzeJob:
         analyzer = ErrorAnalyzer(idx, graph)
         result = analyzer.analyze_error(self.error_log)
 
+        artifacts: dict[str, object] = {}
         artifacts = {
             "index": indexer.to_dict(modules),
             "graph": graph.to_dict(),
