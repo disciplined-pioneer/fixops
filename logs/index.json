@@ -1,0 +1,878 @@
+{
+  "modules": [
+    {
+      "file": "reproduce.py",
+      "module": "reproduce",
+      "imports": [
+        {
+          "module": "os",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "sys",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "traceback",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "sample_app.core.logging",
+          "name": "get_logger",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "api.checkout",
+          "name": "CheckoutService",
+          "asname": null,
+          "kind": "from"
+        }
+      ],
+      "classes": [],
+      "functions": [
+        {
+          "name": "main",
+          "qualname": "reproduce.main",
+          "lineno": 32,
+          "end_lineno": 49,
+          "is_method": false,
+          "class_name": null,
+          "calls": [
+            {
+              "line": 35,
+              "raw": "LOG.info",
+              "kind": "attr",
+              "base": "LOG",
+              "attr": "info"
+            },
+            {
+              "line": 37,
+              "raw": "checkout",
+              "kind": "name",
+              "base": null,
+              "attr": "checkout"
+            },
+            {
+              "line": 37,
+              "raw": "CheckoutService",
+              "kind": "name",
+              "base": null,
+              "attr": "CheckoutService"
+            },
+            {
+              "line": 39,
+              "raw": "traceback.extract_tb",
+              "kind": "attr",
+              "base": "traceback",
+              "attr": "extract_tb"
+            },
+            {
+              "line": 39,
+              "raw": "sys.exc_info",
+              "kind": "attr",
+              "base": "sys",
+              "attr": "exc_info"
+            },
+            {
+              "line": 42,
+              "raw": "replace",
+              "kind": "name",
+              "base": null,
+              "attr": "replace"
+            },
+            {
+              "line": 42,
+              "raw": "os.path.relpath",
+              "kind": "dotted",
+              "base": "os.path",
+              "attr": "relpath"
+            },
+            {
+              "line": 45,
+              "raw": "type",
+              "kind": "name",
+              "base": null,
+              "attr": "type"
+            },
+            {
+              "line": 47,
+              "raw": "error",
+              "kind": "name",
+              "base": null,
+              "attr": "error"
+            },
+            {
+              "line": 47,
+              "raw": "LOG.bind",
+              "kind": "attr",
+              "base": "LOG",
+              "attr": "bind"
+            },
+            {
+              "line": 48,
+              "raw": "print",
+              "kind": "name",
+              "base": null,
+              "attr": "print"
+            }
+          ],
+          "local_types": {}
+        }
+      ]
+    },
+    {
+      "file": "__init__.py",
+      "module": "__init__",
+      "imports": [],
+      "classes": [],
+      "functions": []
+    },
+    {
+      "file": "api/checkout.py",
+      "module": "api.checkout",
+      "imports": [
+        {
+          "module": "sample_app.core.decorators",
+          "name": "log_execution",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "services.pricing",
+          "name": "PricingService",
+          "asname": null,
+          "kind": "from"
+        }
+      ],
+      "classes": [
+        {
+          "name": "CheckoutService",
+          "lineno": 5,
+          "bases": [],
+          "methods": [
+            "checkout"
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "checkout",
+          "qualname": "api.checkout.CheckoutService.checkout",
+          "lineno": 7,
+          "end_lineno": 9,
+          "is_method": true,
+          "class_name": "CheckoutService",
+          "calls": [
+            {
+              "line": 8,
+              "raw": "calculate_total",
+              "kind": "name",
+              "base": null,
+              "attr": "calculate_total"
+            },
+            {
+              "line": 8,
+              "raw": "PricingService",
+              "kind": "name",
+              "base": null,
+              "attr": "PricingService"
+            }
+          ],
+          "local_types": {}
+        }
+      ]
+    },
+    {
+      "file": "api/__init__.py",
+      "module": "api.__init__",
+      "imports": [],
+      "classes": [],
+      "functions": []
+    },
+    {
+      "file": "core/decorators.py",
+      "module": "core.decorators",
+      "imports": [
+        {
+          "module": "inspect",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "time",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "functools",
+          "name": "wraps",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "sample_app.core.logging",
+          "name": "get_logger",
+          "asname": null,
+          "kind": "from"
+        }
+      ],
+      "classes": [],
+      "functions": [
+        {
+          "name": "sanitize",
+          "qualname": "core.decorators.sanitize",
+          "lineno": 19,
+          "end_lineno": 45,
+          "is_method": false,
+          "class_name": null,
+          "calls": [
+            {
+              "line": 25,
+              "raw": "isinstance",
+              "kind": "name",
+              "base": null,
+              "attr": "isinstance"
+            },
+            {
+              "line": 29,
+              "raw": "key.lower",
+              "kind": "attr",
+              "base": "key",
+              "attr": "lower"
+            },
+            {
+              "line": 30,
+              "raw": "sanitize",
+              "kind": "name",
+              "base": null,
+              "attr": "sanitize"
+            },
+            {
+              "line": 31,
+              "raw": "value.items",
+              "kind": "attr",
+              "base": "value",
+              "attr": "items"
+            },
+            {
+              "line": 34,
+              "raw": "isinstance",
+              "kind": "name",
+              "base": null,
+              "attr": "isinstance"
+            },
+            {
+              "line": 37,
+              "raw": "sanitize",
+              "kind": "name",
+              "base": null,
+              "attr": "sanitize"
+            },
+            {
+              "line": 42,
+              "raw": "isinstance",
+              "kind": "name",
+              "base": null,
+              "attr": "isinstance"
+            },
+            {
+              "line": 42,
+              "raw": "type",
+              "kind": "name",
+              "base": null,
+              "attr": "type"
+            },
+            {
+              "line": 45,
+              "raw": "type",
+              "kind": "name",
+              "base": null,
+              "attr": "type"
+            }
+          ],
+          "local_types": {}
+        },
+        {
+          "name": "log_execution",
+          "qualname": "core.decorators.log_execution",
+          "lineno": 48,
+          "end_lineno": 222,
+          "is_method": false,
+          "class_name": null,
+          "calls": [
+            {
+              "line": 78,
+              "raw": "inspect.iscoroutinefunction",
+              "kind": "attr",
+              "base": "inspect",
+              "attr": "iscoroutinefunction"
+            },
+            {
+              "line": 83,
+              "raw": "time.perf_counter",
+              "kind": "attr",
+              "base": "time",
+              "attr": "perf_counter"
+            },
+            {
+              "line": 85,
+              "raw": "get_logger",
+              "kind": "name",
+              "base": null,
+              "attr": "get_logger"
+            },
+            {
+              "line": 92,
+              "raw": "log.debug",
+              "kind": "attr",
+              "base": "log",
+              "attr": "debug"
+            },
+            {
+              "line": 98,
+              "raw": "func",
+              "kind": "name",
+              "base": null,
+              "attr": "func"
+            },
+            {
+              "line": 104,
+              "raw": "time.perf_counter",
+              "kind": "attr",
+              "base": "time",
+              "attr": "perf_counter"
+            },
+            {
+              "line": 107,
+              "raw": "info",
+              "kind": "name",
+              "base": null,
+              "attr": "info"
+            },
+            {
+              "line": 107,
+              "raw": "log.bind",
+              "kind": "attr",
+              "base": "log",
+              "attr": "bind"
+            },
+            {
+              "line": 110,
+              "raw": "round",
+              "kind": "name",
+              "base": null,
+              "attr": "round"
+            },
+            {
+              "line": 123,
+              "raw": "time.perf_counter",
+              "kind": "attr",
+              "base": "time",
+              "attr": "perf_counter"
+            },
+            {
+              "line": 126,
+              "raw": "exception",
+              "kind": "name",
+              "base": null,
+              "attr": "exception"
+            },
+            {
+              "line": 126,
+              "raw": "log.bind",
+              "kind": "attr",
+              "base": "log",
+              "attr": "bind"
+            },
+            {
+              "line": 129,
+              "raw": "round",
+              "kind": "name",
+              "base": null,
+              "attr": "round"
+            },
+            {
+              "line": 134,
+              "raw": "type",
+              "kind": "name",
+              "base": null,
+              "attr": "type"
+            },
+            {
+              "line": 135,
+              "raw": "str",
+              "kind": "name",
+              "base": null,
+              "attr": "str"
+            },
+            {
+              "line": 138,
+              "raw": "sanitize",
+              "kind": "name",
+              "base": null,
+              "attr": "sanitize"
+            },
+            {
+              "line": 139,
+              "raw": "sanitize",
+              "kind": "name",
+              "base": null,
+              "attr": "sanitize"
+            },
+            {
+              "line": 80,
+              "raw": "wraps",
+              "kind": "name",
+              "base": null,
+              "attr": "wraps"
+            },
+            {
+              "line": 156,
+              "raw": "time.perf_counter",
+              "kind": "attr",
+              "base": "time",
+              "attr": "perf_counter"
+            },
+            {
+              "line": 158,
+              "raw": "get_logger",
+              "kind": "name",
+              "base": null,
+              "attr": "get_logger"
+            },
+            {
+              "line": 165,
+              "raw": "log.debug",
+              "kind": "attr",
+              "base": "log",
+              "attr": "debug"
+            },
+            {
+              "line": 171,
+              "raw": "func",
+              "kind": "name",
+              "base": null,
+              "attr": "func"
+            },
+            {
+              "line": 177,
+              "raw": "time.perf_counter",
+              "kind": "attr",
+              "base": "time",
+              "attr": "perf_counter"
+            },
+            {
+              "line": 180,
+              "raw": "info",
+              "kind": "name",
+              "base": null,
+              "attr": "info"
+            },
+            {
+              "line": 180,
+              "raw": "log.bind",
+              "kind": "attr",
+              "base": "log",
+              "attr": "bind"
+            },
+            {
+              "line": 183,
+              "raw": "round",
+              "kind": "name",
+              "base": null,
+              "attr": "round"
+            },
+            {
+              "line": 196,
+              "raw": "time.perf_counter",
+              "kind": "attr",
+              "base": "time",
+              "attr": "perf_counter"
+            },
+            {
+              "line": 199,
+              "raw": "exception",
+              "kind": "name",
+              "base": null,
+              "attr": "exception"
+            },
+            {
+              "line": 199,
+              "raw": "log.bind",
+              "kind": "attr",
+              "base": "log",
+              "attr": "bind"
+            },
+            {
+              "line": 202,
+              "raw": "round",
+              "kind": "name",
+              "base": null,
+              "attr": "round"
+            },
+            {
+              "line": 207,
+              "raw": "type",
+              "kind": "name",
+              "base": null,
+              "attr": "type"
+            },
+            {
+              "line": 208,
+              "raw": "str",
+              "kind": "name",
+              "base": null,
+              "attr": "str"
+            },
+            {
+              "line": 211,
+              "raw": "sanitize",
+              "kind": "name",
+              "base": null,
+              "attr": "sanitize"
+            },
+            {
+              "line": 212,
+              "raw": "sanitize",
+              "kind": "name",
+              "base": null,
+              "attr": "sanitize"
+            },
+            {
+              "line": 153,
+              "raw": "wraps",
+              "kind": "name",
+              "base": null,
+              "attr": "wraps"
+            }
+          ],
+          "local_types": {}
+        }
+      ]
+    },
+    {
+      "file": "core/logging.py",
+      "module": "core.logging",
+      "imports": [
+        {
+          "module": "os",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "sys",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "uuid",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "pathlib",
+          "name": "Path",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "loguru",
+          "name": "logger",
+          "asname": null,
+          "kind": "from"
+        }
+      ],
+      "classes": [],
+      "functions": [
+        {
+          "name": "get_logger",
+          "qualname": "core.logging.get_logger",
+          "lineno": 108,
+          "end_lineno": 120,
+          "is_method": false,
+          "class_name": null,
+          "calls": [
+            {
+              "line": 116,
+              "raw": "app_logger.bind",
+              "kind": "attr",
+              "base": "app_logger",
+              "attr": "bind"
+            },
+            {
+              "line": 118,
+              "raw": "str",
+              "kind": "name",
+              "base": null,
+              "attr": "str"
+            },
+            {
+              "line": 118,
+              "raw": "uuid.uuid4",
+              "kind": "attr",
+              "base": "uuid",
+              "attr": "uuid4"
+            }
+          ],
+          "local_types": {}
+        }
+      ]
+    },
+    {
+      "file": "core/middleware.py",
+      "module": "core.middleware",
+      "imports": [
+        {
+          "module": "uuid",
+          "asname": null,
+          "kind": "import"
+        },
+        {
+          "module": "fastapi",
+          "name": "Request",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "contextvars",
+          "name": "ContextVar",
+          "asname": null,
+          "kind": "from"
+        }
+      ],
+      "classes": [],
+      "functions": [
+        {
+          "name": "request_id_middleware",
+          "qualname": "core.middleware.request_id_middleware",
+          "lineno": 12,
+          "end_lineno": 27,
+          "is_method": false,
+          "class_name": null,
+          "calls": [
+            {
+              "line": 17,
+              "raw": "str",
+              "kind": "name",
+              "base": null,
+              "attr": "str"
+            },
+            {
+              "line": 17,
+              "raw": "uuid.uuid4",
+              "kind": "attr",
+              "base": "uuid",
+              "attr": "uuid4"
+            },
+            {
+              "line": 19,
+              "raw": "request_id.set",
+              "kind": "attr",
+              "base": "request_id",
+              "attr": "set"
+            },
+            {
+              "line": 21,
+              "raw": "call_next",
+              "kind": "name",
+              "base": null,
+              "attr": "call_next"
+            }
+          ],
+          "local_types": {}
+        }
+      ]
+    },
+    {
+      "file": "core/__init__.py",
+      "module": "core.__init__",
+      "imports": [],
+      "classes": [],
+      "functions": []
+    },
+    {
+      "file": "models/product.py",
+      "module": "models.product",
+      "imports": [],
+      "classes": [
+        {
+          "name": "Product",
+          "lineno": 1,
+          "bases": [],
+          "methods": [
+            "__init__"
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "__init__",
+          "qualname": "models.product.Product.__init__",
+          "lineno": 3,
+          "end_lineno": 6,
+          "is_method": true,
+          "class_name": "Product",
+          "calls": [],
+          "local_types": {}
+        }
+      ]
+    },
+    {
+      "file": "models/__init__.py",
+      "module": "models.__init__",
+      "imports": [],
+      "classes": [],
+      "functions": []
+    },
+    {
+      "file": "repositories/inventory.py",
+      "module": "repositories.inventory",
+      "imports": [
+        {
+          "module": "sample_app.core.decorators",
+          "name": "log_execution",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "sample_app.core.logging",
+          "name": "get_logger",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "models.product",
+          "name": "Product",
+          "asname": null,
+          "kind": "from"
+        }
+      ],
+      "classes": [
+        {
+          "name": "InventoryRepository",
+          "lineno": 11,
+          "bases": [],
+          "methods": [
+            "get"
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "get",
+          "qualname": "repositories.inventory.InventoryRepository.get",
+          "lineno": 14,
+          "end_lineno": 25,
+          "is_method": true,
+          "class_name": "InventoryRepository",
+          "calls": [
+            {
+              "line": 19,
+              "raw": "get_logger",
+              "kind": "name",
+              "base": null,
+              "attr": "get_logger"
+            },
+            {
+              "line": 20,
+              "raw": "_INVENTORY_DB.get",
+              "kind": "attr",
+              "base": "_INVENTORY_DB",
+              "attr": "get"
+            },
+            {
+              "line": 22,
+              "raw": "log.warning",
+              "kind": "attr",
+              "base": "log",
+              "attr": "warning"
+            },
+            {
+              "line": 24,
+              "raw": "log.debug",
+              "kind": "attr",
+              "base": "log",
+              "attr": "debug"
+            }
+          ],
+          "local_types": {}
+        }
+      ]
+    },
+    {
+      "file": "repositories/__init__.py",
+      "module": "repositories.__init__",
+      "imports": [],
+      "classes": [],
+      "functions": []
+    },
+    {
+      "file": "services/pricing.py",
+      "module": "services.pricing",
+      "imports": [
+        {
+          "module": "sample_app.core.decorators",
+          "name": "log_execution",
+          "asname": null,
+          "kind": "from"
+        },
+        {
+          "module": "repositories.inventory",
+          "name": "InventoryRepository",
+          "asname": null,
+          "kind": "from"
+        }
+      ],
+      "classes": [
+        {
+          "name": "PricingService",
+          "lineno": 5,
+          "bases": [],
+          "methods": [
+            "calculate_total"
+          ]
+        }
+      ],
+      "functions": [
+        {
+          "name": "calculate_total",
+          "qualname": "services.pricing.PricingService.calculate_total",
+          "lineno": 8,
+          "end_lineno": 15,
+          "is_method": true,
+          "class_name": "PricingService",
+          "calls": [
+            {
+              "line": 10,
+              "raw": "InventoryRepository",
+              "kind": "name",
+              "base": null,
+              "attr": "InventoryRepository"
+            },
+            {
+              "line": 13,
+              "raw": "repo.get",
+              "kind": "attr",
+              "base": "repo",
+              "attr": "get"
+            }
+          ],
+          "local_types": {
+            "repo": "InventoryRepository"
+          }
+        }
+      ]
+    },
+    {
+      "file": "services/__init__.py",
+      "module": "services.__init__",
+      "imports": [],
+      "classes": [],
+      "functions": []
+    }
+  ]
+}

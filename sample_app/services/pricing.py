@@ -3,8 +3,10 @@ from repositories.inventory import InventoryRepository
 
 
 class PricingService:
+    """Сервис для расчета итоговой стоимости заказа."""
     @log_execution(event="pricing.calculate_total")
     def calculate_total(self, items):
+        """Рассчитывает общую стоимость переданных позиций заказа."""
         repo = InventoryRepository()
         total = 0.0
         for item in items:

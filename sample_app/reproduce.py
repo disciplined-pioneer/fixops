@@ -30,6 +30,7 @@ LOG = get_logger(event="reproduce.run")
 
 
 def main():
+    """Воспроизводит ошибку оформления заказа, обрабатывая заказ с неизвестным SKU."""
     order = {"items": [{"sku": "SKU-999", "qty": 2}]}
     LOG.info("Reproducing error", order=order)
     try:
