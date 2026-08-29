@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-
 class AnalysisConfig(BaseSettings):
     """Конфигурация для анализатора ошибок."""
 

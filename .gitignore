@@ -6,6 +6,7 @@ __pycache__/
 
 # C extensions
 *.so
+.fixops
 
 # Distribution / packaging
 .Python
@@ -14,6 +15,7 @@ develop-eggs/
 dist/
 downloads/
 eggs/
+logs/
 .eggs/
 lib/
 lib64/
@@ -167,4 +169,3 @@ cython_debug/
 
 secrets/*
 !secrets/.gitkeep
-

@@ -20,17 +20,18 @@ analyze_error.py — статический анализ ошибки по гр�
   - last_error_analysis.json — цепочка/координаты ошибки
   - llm_prompt.md            — ИТОГОВЫЙ промпт, который уходит в LLM
 """
-import json
 import os
 import sys
+import json
+from pathlib import Path
 
-from code_intel.indexer import ProjectIndexer
-from code_intel.resolver import ProjectIndex, CallResolver
+from config import settings
+from code_intel.html_view import save_html_view
 from code_intel.graph import GraphBuilder
+from code_intel.indexer import ProjectIndexer
 from code_intel.error_analyzer import ErrorAnalyzer
 from code_intel.context_builder import ContextBuilder
-from code_intel.html_view import save_html_view
-from config import settings
+from code_intel.resolver import ProjectIndex, CallResolver
 
 
 class ErrorLoader:
@@ -144,6 +145,8 @@ class AnalyzeJob:
         )
 
     def run(self) -> int:
+
+        Path("sandbox").mkdir(exist_ok=True) # папка для редактирования
         artifacts = self.analyze()
         result = artifacts["analysis"]
 
