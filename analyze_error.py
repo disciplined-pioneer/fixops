@@ -23,6 +23,7 @@ analyze_error.py — статический анализ ошибки по гр�
 import os
 import sys
 import json
+import argparse
 from pathlib import Path
 
 from config import settings
@@ -169,21 +170,28 @@ class AnalyzeJob:
 
 
 def main() -> int:
-    if not os.path.isdir(settings.analysis.PROJECT_PATH):
-        sys.stderr.write(f"Не найдена папка проекта: {settings.analysis.PROJECT_PATH}\n")
+    parser = argparse.ArgumentParser(description="Анализ ошибки проекта.")
+    parser.add_argument("project", nargs="?", default="sample_app", help="Имя проекта в папке sandbox (по умолчанию: sample_app)")
+    args = parser.parse_args()
+
+    project_root = os.path.join("sandbox", args.project)
+    error_log_path = os.path.join(project_root, "logs", "app.log")
+    logs_dir = os.path.join(project_root, ".fixops")
+
+    if not os.path.isdir(project_root):
+        sys.stderr.write(f"Не найдена папка проекта: {project_root}\n")
         return 2
-    if not os.path.isfile(settings.analysis.ERROR_LOG_PATH):
-        sys.stderr.write(f"Не найден лог-файл проекта: {settings.analysis.ERROR_LOG_PATH}\n")
-        sys.stderr.write("Сначала запустите: python sample_app/reproduce.py\n")
+    if not os.path.isfile(error_log_path):
+        sys.stderr.write(f"Не найден лог-файл проекта: {error_log_path}\n")
         return 2
 
     try:
-        error_log = ErrorLoader.from_file(settings.analysis.ERROR_LOG_PATH)
+        error_log = ErrorLoader.from_file(error_log_path)
     except (OSError, ValueError) as exc:
         sys.stderr.write(f"Ошибка чтения лога: {exc}\n")
         return 2
 
-    job = AnalyzeJob(settings.analysis.PROJECT_PATH, error_log, logs_dir=settings.analysis.LOGS_DIR,
+    job = AnalyzeJob(project_root, error_log, logs_dir=logs_dir,
                      extra_ignore_dirs=settings.analysis.EXTRA_IGNORE_DIRS)
     return job.run()
 
