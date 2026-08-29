@@ -28,11 +28,7 @@ from pathlib import Path
 
 from config import settings
 from code_intel.html_view import save_html_view
-from code_intel.graph import GraphBuilder
-from code_intel.indexer import ProjectIndexer
-from code_intel.error_analyzer import ErrorAnalyzer
-from code_intel.context_builder import ContextBuilder
-from code_intel.resolver import ProjectIndex, CallResolver
+from workflow import create_workflow, FixOpsState
 
 
 class ErrorLoader:
@@ -100,32 +96,33 @@ class AnalyzeJob:
         self.error_log = error_log
         self.logs_dir = os.path.abspath(logs_dir or os.path.join(self.project_root, "logs"))
         self.extra_ignore_dirs = tuple(extra_ignore_dirs)
+        self.workflow = create_workflow()
 
     async def analyze(self) -> dict:
         """Возвращает результат анализа + артефакты для сохранения."""
-        indexer = ProjectIndexer()
-        ignore_dirs = ProjectIndexer.IGNORE_DIRS + self.extra_ignore_dirs
-
-        modules = await indexer.scan(self.project_root, ignore_dirs=ignore_dirs)
-
-        idx = ProjectIndex(modules)
-        graph = await GraphBuilder(CallResolver(idx)).build(idx)
-
-        analyzer = ErrorAnalyzer(idx, graph)
-        result = await analyzer.analyze_error(self.error_log)
-
-        artifacts: dict[str, object] = {}
-        artifacts = {
-            "index": indexer.to_dict(modules),
-            "graph": graph.to_dict(),
-            "analysis": result,
+        initial_state: FixOpsState = {
+            "project_root": self.project_root,
+            "error_log": self.error_log,
+            "logs_dir": self.logs_dir,
+            "extra_ignore_dirs": self.extra_ignore_dirs,
+            "modules": None,
+            "indexer": None, # Добавлено
+            "index": None,
+            "graph": None,
+            "analysis_result": {},
+            "llm_context": None,
+            "llm_prompt": ""
         }
-        if result.get("resolved_node") is None:
-            return artifacts
 
-        ctx = await ContextBuilder(self.project_root).build_llm_context(idx, result)
-        artifacts["prompt"] = ContextBuilder.render_llm_prompt(ctx)
-        return artifacts
+        final_state = await self.workflow.ainvoke(initial_state)
+
+        # Mapping result back to original artifact format for saver
+        return {
+            "index": final_state["indexer"].to_dict(final_state["modules"]), # Используем indexer для генерации dict
+            "graph": final_state["graph"].to_dict(),
+            "analysis": final_state["analysis_result"],
+            "prompt": final_state.get("llm_prompt")
+        }
 
     @staticmethod
     def _sync_write_json(path: str, data: dict) -> None:
@@ -162,7 +159,6 @@ class AnalyzeJob:
             print(result["message"])
             return 1
 
-        # ...
         saved = [os.path.join(self.logs_dir, name) for name in
                  ("index.json", "graph.json", "last_error_analysis.json",
                   "graph_view.html", "llm_prompt.md")]
