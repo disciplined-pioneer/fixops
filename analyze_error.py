@@ -20,36 +20,17 @@ analyze_error.py — статический анализ ошибки по гр�
   - last_error_analysis.json — цепочка/координаты ошибки
   - llm_prompt.md            — ИТОГОВЫЙ промпт, который уходит в LLM
 """
-
-from __future__ import annotations
-
 import json
 import os
 import sys
 
-_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
-if _REPO_ROOT not in sys.path:
-    sys.path.insert(0, _REPO_ROOT)
-
-from code_intel.indexer import ProjectIndexer                   # noqa: E402
-from code_intel.resolver import ProjectIndex, CallResolver      # noqa: E402
-from code_intel.graph import GraphBuilder                       # noqa: E402
-from code_intel.error_analyzer import ErrorAnalyzer             # noqa: E402
-from code_intel.context_builder import ContextBuilder           # noqa: E402
-from code_intel.html_view import save_html_view                 # noqa: E402
-
-
-# =====================================================================
-# КОНФИГУРАЦИЯ — впишите сюда свой проект и лог ошибки
-# =====================================================================
-PROJECT_PATH = os.path.join(_REPO_ROOT, "sample_app")          # корень анализируемого проекта
-ERROR_LOG_PATH = os.path.join(_REPO_ROOT, "sample_app", "logs", "app.log")  # лог-файл проекта
-LOGS_DIR = os.path.join(_REPO_ROOT, "logs")                     # сюда складываются все артефакты анализа
-EXTRA_IGNORE_DIRS: tuple = ()                                  # доп. каталоги, исключаемые из индексации (напр. ("core",))
-LOG_TAIL_LINES = 50                                            # сколько последних строк лога читаем
-# =====================================================================
-
-REQUIRED_ERROR_KEYS = ("file", "function", "line", "error")
+from code_intel.indexer import ProjectIndexer
+from code_intel.resolver import ProjectIndex, CallResolver
+from code_intel.graph import GraphBuilder
+from code_intel.error_analyzer import ErrorAnalyzer
+from code_intel.context_builder import ContextBuilder
+from code_intel.html_view import save_html_view
+from config import settings
 
 
 class ErrorLoader:
@@ -81,7 +62,7 @@ class ErrorLoader:
         ]
 
     @staticmethod
-    def from_file(path: str, tail: int = LOG_TAIL_LINES) -> dict:
+    def from_file(path: str, tail: int = settings.analysis.LOG_TAIL_LINES) -> dict:
         lines = ErrorLoader._tail(path, tail)
         if not lines:
             raise ValueError(f"Лог-файл пуст: {path}")
@@ -93,7 +74,7 @@ class ErrorLoader:
                 continue  # не-json строка (например, обрыв записи) — пропускаем
             level = (record.get("level") or {}).get("name")
             extra = record.get("extra") or {}
-            if level == "ERROR" and all(extra.get(k) is not None for k in REQUIRED_ERROR_KEYS):
+            if level == "ERROR" and all(extra.get(k) is not None for k in settings.analysis.REQUIRED_ERROR_KEYS):
                 return {
                     "file": extra["file"],
                     "line": int(extra["line"]),
@@ -103,7 +84,7 @@ class ErrorLoader:
 
         raise ValueError(
             f"В последних {tail} строках лога {path} не найдено ERROR-записи "
-            f"с координатами ошибки ({', '.join(REQUIRED_ERROR_KEYS)}). "
+            f"с координатами ошибки ({', '.join(settings.analysis.REQUIRED_ERROR_KEYS)}). "
             f"Запустите python sample_app/reproduce.py или увеличьте LOG_TAIL_LINES"
         )
 
@@ -185,22 +166,22 @@ class AnalyzeJob:
 
 
 def main() -> int:
-    if not os.path.isdir(PROJECT_PATH):
-        sys.stderr.write(f"Не найдена папка проекта: {PROJECT_PATH}\n")
+    if not os.path.isdir(settings.analysis.PROJECT_PATH):
+        sys.stderr.write(f"Не найдена папка проекта: {settings.analysis.PROJECT_PATH}\n")
         return 2
-    if not os.path.isfile(ERROR_LOG_PATH):
-        sys.stderr.write(f"Не найден лог-файл проекта: {ERROR_LOG_PATH}\n")
+    if not os.path.isfile(settings.analysis.ERROR_LOG_PATH):
+        sys.stderr.write(f"Не найден лог-файл проекта: {settings.analysis.ERROR_LOG_PATH}\n")
         sys.stderr.write("Сначала запустите: python sample_app/reproduce.py\n")
         return 2
 
     try:
-        error_log = ErrorLoader.from_file(ERROR_LOG_PATH)
+        error_log = ErrorLoader.from_file(settings.analysis.ERROR_LOG_PATH)
     except (OSError, ValueError) as exc:
         sys.stderr.write(f"Ошибка чтения лога: {exc}\n")
         return 2
 
-    job = AnalyzeJob(PROJECT_PATH, error_log, logs_dir=LOGS_DIR,
-                     extra_ignore_dirs=EXTRA_IGNORE_DIRS)
+    job = AnalyzeJob(settings.analysis.PROJECT_PATH, error_log, logs_dir=settings.analysis.LOGS_DIR,
+                     extra_ignore_dirs=settings.analysis.EXTRA_IGNORE_DIRS)
     return job.run()
 
 
