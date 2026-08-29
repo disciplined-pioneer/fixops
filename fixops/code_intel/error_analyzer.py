@@ -20,6 +20,7 @@ error_analyzer.py — превращает "плоскую" ошибку из л
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
 
@@ -39,40 +40,46 @@ class ErrorAnalyzer:
                         return fn.qualname
         return None
 
-    def _walk_callers(self, qualname: str, depth: int, max_depth: int, seen: set) -> list[dict]:
+    async def _walk_callers(self, qualname: str, depth: int, max_depth: int, seen: set) -> list[dict]:
         if depth >= max_depth or qualname in seen:
             return []
         seen.add(qualname)
         chain = []
-        for e in self.g.callers(qualname):
+        
+        # self.g.callers is likely synchronous but might be fast enough
+        callers = await asyncio.to_thread(self.g.callers, qualname)
+        for e in callers:
             chain.append({
                 "qualname": e.source, "via_file": e.file, "via_line": e.line,
                 "resolved": e.resolved, "from_runtime": e.from_runtime,
-                "callers": self._walk_callers(e.source, depth + 1, max_depth, seen),
+                "callers": await self._walk_callers(e.source, depth + 1, max_depth, seen),
             })
         return chain
 
-    def _walk_callees(self, qualname: str, depth: int, max_depth: int, seen: set) -> list[dict]:
+    async def _walk_callees(self, qualname: str, depth: int, max_depth: int, seen: set) -> list[dict]:
         if depth >= max_depth or qualname in seen:
             return []
         seen.add(qualname)
         chain = []
-        for e in self.g.callees(qualname):
+        
+        # self.g.callees is likely synchronous
+        callees = await asyncio.to_thread(self.g.callees, qualname)
+        for e in callees:
             chain.append({
                 "qualname": e.target, "file": e.file, "line": e.line,
                 "resolved": e.resolved, "from_runtime": e.from_runtime,
-                "callees": self._walk_callees(e.target, depth + 1, max_depth, seen),
+                "callees": await self._walk_callees(e.target, depth + 1, max_depth, seen),
             })
         return chain
 
-    def analyze_error(self, error_log: dict, max_depth: int = 4) -> dict:
+    async def analyze_error(self, error_log: dict, max_depth: int = 4) -> dict:
         qualname = self.find_node_by_location(error_log["file"], error_log["function"])
         if qualname is None:
             return {"error": error_log, "resolved_node": None,
                     "message": "Не удалось сопоставить лог с узлом графа (файл/функция не найдены в индексе)."}
 
-        callers = self._walk_callers(qualname, 0, max_depth, set())
-        callees = self._walk_callees(qualname, 0, max_depth, set())
+        callers = await self._walk_callers(qualname, 0, max_depth, set())
+        callees = await self._walk_callees(qualname, 0, max_depth, set())
 
         return {
             "error": error_log,
@@ -148,9 +155,9 @@ class ErrorAnalyzer:
         return "\n".join(lines)
 
 
-def analyze_error(idx, g, error_log: dict, max_depth: int = 4) -> dict:
+async def analyze_error(idx, g, error_log: dict, max_depth: int = 4) -> dict:
     """Обратно-совместимая обёртка над ErrorAnalyzer.analyze_error."""
-    return ErrorAnalyzer(idx, g).analyze_error(error_log, max_depth)
+    return await ErrorAnalyzer(idx, g).analyze_error(error_log, max_depth)
 
 
 def render_chain_text(result: dict) -> str:

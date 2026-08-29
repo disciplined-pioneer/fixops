@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import ast
 import os
+import asyncio
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
@@ -103,25 +104,30 @@ class ProjectIndexer:
             return raw, base, attr
         return ast.dump(node), None, None
 
-    def scan(self, root: str, ignore_dirs: tuple = IGNORE_DIRS) -> list[ModuleInfo]:
+    async def scan(self, root: str, ignore_dirs: tuple = IGNORE_DIRS) -> list[ModuleInfo]:
         """Проходит по проекту и индексирует каждый .py файл. Это и есть шаг 1 —
         построение индекса без чтения всего проекта в контекст модели целиком."""
         modules = []
+        # os.walk is synchronous, but probably fast enough. 
+        # Making it async might be overkill unless the project is huge.
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [d for d in dirnames if d not in ignore_dirs]
             for fn in filenames:
                 if fn.endswith(".py"):
                     full = os.path.join(dirpath, fn)
                     try:
-                        modules.append(self.index_file(root, full))
+                        modules.append(await self.index_file(root, full))
                     except SyntaxError:
                         continue
         return modules
 
-    def index_file(self, root: str, path: str) -> ModuleInfo:
-        with open(path, "r", encoding="utf-8") as f:
-            source = f.read()
-        tree = ast.parse(source, filename=path)
+    async def index_file(self, root: str, path: str) -> ModuleInfo:
+        def _read_and_parse():
+            with open(path, "r", encoding="utf-8") as f:
+                source = f.read()
+            return ast.parse(source, filename=path)
+        
+        tree = await asyncio.to_thread(_read_and_parse)
 
         mod = ModuleInfo(
             file=os.path.relpath(path, root).replace(os.sep, "/"),
@@ -221,14 +227,14 @@ class _FunctionVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-def scan_project(root: str, ignore_dirs: tuple = ProjectIndexer.IGNORE_DIRS) -> list[ModuleInfo]:
+async def scan_project(root: str, ignore_dirs: tuple = ProjectIndexer.IGNORE_DIRS) -> list[ModuleInfo]:
     """Обратно-совместимая обёртка над ProjectIndexer.scan."""
-    return ProjectIndexer().scan(root, ignore_dirs)
+    return await ProjectIndexer().scan(root, ignore_dirs)
 
 
-def index_file(root: str, path: str) -> ModuleInfo:
+async def index_file(root: str, path: str) -> ModuleInfo:
     """Обратно-совместимая обёртка над ProjectIndexer.index_file."""
-    return ProjectIndexer().index_file(root, path)
+    return await ProjectIndexer().index_file(root, path)
 
 
 def to_dict(modules: list[ModuleInfo]) -> dict:

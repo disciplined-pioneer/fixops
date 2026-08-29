@@ -21,8 +21,7 @@ resolver.py — резолвинг вызовов в полные qualname.
 функция-обёртка `resolve_call`.
 """
 
-from __future__ import annotations
-
+import asyncio
 from typing import Optional
 
 
@@ -83,7 +82,7 @@ class CallResolver:
     def __init__(self, idx: ProjectIndex):
         self.idx = idx
 
-    def resolve_call(self, module_obj, fn, call) -> dict:
+    async def resolve_call(self, module_obj, fn, call) -> dict:
         """Пытается резолвнуть один CallSite в qualname узла графа.
 
         Возвращает dict:
@@ -91,48 +90,51 @@ class CallResolver:
            "resolved": True/False,
            "reason": "self" | "import+class" | "local_type" | "unresolved"}
         """
-        imports = self.idx.imports_for(module_obj)
+        def _resolve_sync():
+            imports = self.idx.imports_for(module_obj)
 
-        # 1) self.method(...) -> метод текущего класса
-        if call["kind"] == "self_attr" and fn.class_name:
-            key = (fn.class_name, call["attr"])
-            if key in self.idx.methods_by_class:
-                return {"target": self.idx.methods_by_class[key], "resolved": True, "reason": "self"}
+            # 1) self.method(...) -> метод текущего класса
+            if call["kind"] == "self_attr" and fn.class_name:
+                key = (fn.class_name, call["attr"])
+                if key in self.idx.methods_by_class:
+                    return {"target": self.idx.methods_by_class[key], "resolved": True, "reason": "self"}
 
-        # 2) ClassName.method(...) где ClassName импортирован
-        if call["kind"] == "attr" and call["base"] in imports:
-            full = imports[call["base"]]              # напр. services.discount.DiscountService
-            cls_name = full.rsplit(".", 1)[-1]
-            key = (cls_name, call["attr"])
-            if key in self.idx.methods_by_class:
-                return {"target": self.idx.methods_by_class[key], "resolved": True, "reason": "import+class"}
+            # 2) ClassName.method(...) где ClassName импортирован
+            if call["kind"] == "attr" and call["base"] in imports:
+                full = imports[call["base"]]              # напр. services.discount.DiscountService
+                cls_name = full.rsplit(".", 1)[-1]
+                key = (cls_name, call["attr"])
+                if key in self.idx.methods_by_class:
+                    return {"target": self.idx.methods_by_class[key], "resolved": True, "reason": "import+class"}
 
-        # 3) переменная с известным локальным типом: promo = PromoRepository(); promo.get(...)
-        if call["kind"] == "attr" and call["base"] in fn.local_types:
-            cls_name = fn.local_types[call["base"]]
-            key = (cls_name, call["attr"])
-            if key in self.idx.methods_by_class:
-                return {"target": self.idx.methods_by_class[key], "resolved": True, "reason": "local_type"}
-            # тип мог прийти из импорта: promo = PromoRepository(); PromoRepository импортирован как алиас
-            if cls_name in imports:
-                real_cls = imports[cls_name].rsplit(".", 1)[-1]
-                key2 = (real_cls, call["attr"])
-                if key2 in self.idx.methods_by_class:
-                    return {"target": self.idx.methods_by_class[key2], "resolved": True, "reason": "local_type+import"}
+            # 3) переменная с известным локальным типом: promo = PromoRepository(); promo.get(...)
+            if call["kind"] == "attr" and call["base"] in fn.local_types:
+                cls_name = fn.local_types[call["base"]]
+                key = (cls_name, call["attr"])
+                if key in self.idx.methods_by_class:
+                    return {"target": self.idx.methods_by_class[key], "resolved": True, "reason": "local_type"}
+                # тип мог прийти из импорта: promo = PromoRepository(); PromoRepository импортирован как алиас
+                if cls_name in imports:
+                    real_cls = imports[cls_name].rsplit(".", 1)[-1]
+                    key2 = (real_cls, call["attr"])
+                    if key2 in self.idx.methods_by_class:
+                        return {"target": self.idx.methods_by_class[key2], "resolved": True, "reason": "local_type+import"}
 
-        # 4) вызов свободной функции (не метод), импортированной напрямую
-        if call["kind"] == "name" and call["attr"] in self.idx.func_to_module:
-            target_module = self.idx.func_to_module[call["attr"]]
-            return {"target": f"{target_module}.{call['attr']}", "resolved": True, "reason": "top_level_function"}
+            # 4) вызов свободной функции (не метод), импортированной напрямую
+            if call["kind"] == "name" and call["attr"] in self.idx.func_to_module:
+                target_module = self.idx.func_to_module[call["attr"]]
+                return {"target": f"{target_module}.{call['attr']}", "resolved": True, "reason": "top_level_function"}
 
-        # 5) вызов конструктора: ClassName(...) — определён в проекте
-        if call["kind"] == "name" and call["attr"] in self.idx.class_to_module:
-            target_module = self.idx.class_to_module[call["attr"]]
-            return {"target": f"{target_module}.{call['attr']}.__init__", "resolved": True, "reason": "constructor"}
+            # 5) вызов конструктора: ClassName(...) — определён в проекте
+            if call["kind"] == "name" and call["attr"] in self.idx.class_to_module:
+                target_module = self.idx.class_to_module[call["attr"]]
+                return {"target": f"{target_module}.{call['attr']}.__init__", "resolved": True, "reason": "constructor"}
 
-        return {"target": call["raw"], "resolved": False, "reason": "unresolved"}
+            return {"target": call["raw"], "resolved": False, "reason": "unresolved"}
+
+        return await asyncio.to_thread(_resolve_sync)
 
 
-def resolve_call(idx: ProjectIndex, module_obj, fn, call) -> dict:
+async def resolve_call(idx: ProjectIndex, module_obj, fn, call) -> dict:
     """Обратно-совместимая обёртка над CallResolver.resolve_call."""
-    return CallResolver(idx).resolve_call(module_obj, fn, call)
+    return await CallResolver(idx).resolve_call(module_obj, fn, call)

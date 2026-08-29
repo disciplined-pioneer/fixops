@@ -27,13 +27,12 @@ tracer.py — runtime-трассировка вызовов (шаг 7.3).
 пропускаются: вызывающий ищется выше по стеку.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import sys
 import time
 import uuid
+import asyncio
 from contextlib import contextmanager
 
 
@@ -109,11 +108,32 @@ class RuntimeTracer:
         finally:
             sys.settrace(old_trace)
             if self.log_path:
+                # Running blocking I/O in finally block, must be careful
                 os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
                 with open(self.log_path, "a", encoding="utf-8") as f:
                     for ev in self.events:
                         if ev["trace_id"] == self._trace_id:
                             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+    
+    async def trace_async(self, trace_id: str | None = None):
+        """Asynchronous wrapper for trace."""
+        self._trace_id = trace_id or str(uuid.uuid4())
+        old_trace = sys.gettrace()
+        sys.settrace(self._trace_calls)
+        try:
+            yield self._trace_id
+        finally:
+            sys.settrace(old_trace)
+            if self.log_path:
+                # Ensure log_path is not None before using it
+                log_path = self.log_path
+                def _write_log():
+                    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        for ev in self.events:
+                            if ev["trace_id"] == self._trace_id:
+                                f.write(json.dumps(ev, ensure_ascii=False) + "\n")
+                await asyncio.to_thread(_write_log)
 
     def events_for(self, trace_id: str) -> list[dict]:
         return [e for e in self.events if e["trace_id"] == trace_id]

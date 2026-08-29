@@ -24,9 +24,8 @@ context_builder.py — последний слой перед LLM.
 `build_llm_context` и `render_llm_prompt`.
 """
 
-from __future__ import annotations
-
 import os
+import asyncio
 
 
 class ContextBuilder:
@@ -45,10 +44,14 @@ class ContextBuilder:
                     return m.file, fn.lineno, fn.end_lineno
         return None
 
-    def _read_source_slice(self, file: str, lineno: int, end_lineno: int, raw: bool = False) -> str:
+    async def _read_source_slice(self, file: str, lineno: int, end_lineno: int, raw: bool = False) -> str:
         path = os.path.join(self.project_root, file)
-        with open(path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        
+        def _read_file():
+            with open(path, "r", encoding="utf-8") as f:
+                return f.readlines()
+        
+        lines = await asyncio.to_thread(_read_file)
 
         # lineno в AST 1-based
         slice_lines = lines[lineno - 1:end_lineno]
@@ -118,7 +121,7 @@ class ContextBuilder:
             return "error-location (подтверждено логом)"
         return "unknown"
 
-    def build_llm_context(self, idx, analysis: dict) -> dict:
+    async def build_llm_context(self, idx, analysis: dict) -> dict:
         chain = self._collect_chain_qualnames(analysis)
 
         nodes_with_source = []
@@ -135,9 +138,9 @@ class ContextBuilder:
             file, lineno, end_lineno = loc
 
             # Получаем код с номерами строк для визуальной читаемости
-            source = self._read_source_slice(file, lineno, end_lineno, raw=False)
+            source = await self._read_source_slice(file, lineno, end_lineno, raw=False)
             # И чистый код без номеров, чтобы LLM копировала точный синтаксис
-            raw_source = self._read_source_slice(file, lineno, end_lineno, raw=True)
+            raw_source = await self._read_source_slice(file, lineno, end_lineno, raw=True)
 
             nodes_with_source.append({
                 "qualname": q, "file": file, "lineno": lineno, "end_lineno": end_lineno,
@@ -201,13 +204,14 @@ class ContextBuilder:
         lines.append("...")
         lines.append("<полный_код_теста_на_pytest_с_использованием_monkeypatch>")
         lines.append("```")
+        lines.append("```")
 
         return "\n".join(lines)
 
 
-def build_llm_context(idx, project_root: str, analysis: dict) -> dict:
+async def build_llm_context(idx, project_root: str, analysis: dict) -> dict:
     """Обратно-совместимая обёртка над ContextBuilder.build_llm_context."""
-    return ContextBuilder(project_root).build_llm_context(idx, analysis)
+    return await ContextBuilder(project_root).build_llm_context(idx, analysis)
 
 
 def render_llm_prompt(ctx: dict) -> str:

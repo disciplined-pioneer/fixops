@@ -10,10 +10,9 @@ html_view.py — рендер интерактивной HTML-визуализа
 без сервера), как исходный graph_view.html, но с данными текущего анализа.
 """
 
-from __future__ import annotations
-
 import json
 import os
+import asyncio
 
 _TEMPLATE_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "graph_view.template.html"
@@ -26,10 +25,13 @@ def _to_js(value) -> str:
     return dumped.replace("</", "<\\/")
 
 
-def render_html_view(graph: dict, analysis: dict) -> str:
+async def render_html_view(graph: dict, analysis: dict) -> str:
     """Собирает HTML-визуализацию из данных графа и результата анализа."""
-    with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:
-        html = f.read()
+    def _read_template():
+        with open(_TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            return f.read()
+    
+    html = await asyncio.to_thread(_read_template)
 
     html = html.replace("__GRAPH_JSON__", _to_js(graph))
     html = html.replace("__ANALYSIS_JSON__", _to_js(analysis))
@@ -39,9 +41,15 @@ def render_html_view(graph: dict, analysis: dict) -> str:
     return html
 
 
-def save_html_view(graph: dict, analysis: dict, output_path: str) -> str:
+async def save_html_view(graph: dict, analysis: dict, output_path: str) -> str:
     """Сохраняет HTML-визуализацию в output_path и возвращает путь."""
-    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(render_html_view(graph, analysis))
+    await asyncio.to_thread(os.makedirs, os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    
+    html = await render_html_view(graph, analysis)
+    
+    def _write_file():
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(html)
+            
+    await asyncio.to_thread(_write_file)
     return output_path

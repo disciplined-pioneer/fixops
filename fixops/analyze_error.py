@@ -23,6 +23,7 @@ analyze_error.py — статический анализ ошибки по гр�
 import os
 import sys
 import json
+import asyncio
 
 from config import settings
 from code_intel.html_view import save_html_view
@@ -44,7 +45,7 @@ class ErrorLoader:
     """
 
     @staticmethod
-    def _tail(path: str, n: int) -> list[str]:
+    def _sync_tail(path: str, n: int) -> list[str]:
         """Читает последние n строк файла, не загружая его целиком."""
         with open(path, "rb") as f:
             f.seek(0, os.SEEK_END)
@@ -62,8 +63,8 @@ class ErrorLoader:
         ]
 
     @staticmethod
-    def from_file(path: str, tail: int = settings.analysis.LOG_TAIL_LINES) -> dict:
-        lines = ErrorLoader._tail(path, tail)
+    async def from_file(path: str, tail: int = settings.analysis.LOG_TAIL_LINES) -> dict:
+        lines = await asyncio.to_thread(ErrorLoader._sync_tail, path, tail)
         if not lines:
             raise ValueError(f"Лог-файл пуст: {path}")
 
@@ -99,17 +100,18 @@ class AnalyzeJob:
         self.logs_dir = os.path.abspath(logs_dir or os.path.join(self.project_root, "logs"))
         self.extra_ignore_dirs = tuple(extra_ignore_dirs)
 
-    def analyze(self) -> dict:
+    async def analyze(self) -> dict:
         """Возвращает результат анализа + артефакты для сохранения."""
         indexer = ProjectIndexer()
         ignore_dirs = ProjectIndexer.IGNORE_DIRS + self.extra_ignore_dirs
-        modules = indexer.scan(self.project_root, ignore_dirs=ignore_dirs)
+        
+        modules = await indexer.scan(self.project_root, ignore_dirs=ignore_dirs)
 
         idx = ProjectIndex(modules)
-        graph = GraphBuilder(CallResolver(idx)).build(idx)
+        graph = await GraphBuilder(CallResolver(idx)).build(idx)
 
         analyzer = ErrorAnalyzer(idx, graph)
-        result = analyzer.analyze_error(self.error_log)
+        result = await analyzer.analyze_error(self.error_log)
 
         artifacts: dict[str, object] = {}
         artifacts = {
@@ -120,43 +122,46 @@ class AnalyzeJob:
         if result.get("resolved_node") is None:
             return artifacts
 
-        ctx = ContextBuilder(self.project_root).build_llm_context(idx, result)
+        ctx = await ContextBuilder(self.project_root).build_llm_context(idx, result)
         artifacts["prompt"] = ContextBuilder.render_llm_prompt(ctx)
         return artifacts
 
     @staticmethod
-    def _write_json(path: str, data: dict) -> None:
+    def _sync_write_json(path: str, data: dict) -> None:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-    def _save_artifacts(self, artifacts: dict) -> None:
-        os.makedirs(self.logs_dir, exist_ok=True)
-        self._write_json(os.path.join(self.logs_dir, "index.json"), artifacts["index"])
-        self._write_json(os.path.join(self.logs_dir, "graph.json"), artifacts["graph"])
-        self._write_json(os.path.join(self.logs_dir, "last_error_analysis.json"), artifacts["analysis"])
+    async def _write_json(self, path: str, data: dict) -> None:
+        await asyncio.to_thread(self._sync_write_json, path, data)
+
+    async def _save_artifacts(self, artifacts: dict) -> None:
+        await asyncio.to_thread(os.makedirs, self.logs_dir, exist_ok=True)
+        await self._write_json(os.path.join(self.logs_dir, "index.json"), artifacts["index"])
+        await self._write_json(os.path.join(self.logs_dir, "graph.json"), artifacts["graph"])
+        await self._write_json(os.path.join(self.logs_dir, "last_error_analysis.json"), artifacts["analysis"])
         if artifacts.get("prompt"):
-            with open(os.path.join(self.logs_dir, "llm_prompt.md"), "w", encoding="utf-8") as f:
-                f.write(artifacts["prompt"])
-        save_html_view(
+            async with asyncio.Lock(): # Simple lock for file writing
+                with open(os.path.join(self.logs_dir, "llm_prompt.md"), "w", encoding="utf-8") as f:
+                    f.write(str(artifacts["prompt"]))
+        
+        await save_html_view(
             artifacts["graph"],
             artifacts["analysis"],
             os.path.join(self.logs_dir, "graph_view.html"),
         )
 
-    def run(self) -> int:
+    async def run(self) -> int:
 
-        artifacts = self.analyze()
+        artifacts = await self.analyze()
         result = artifacts["analysis"]
 
-        self._save_artifacts(artifacts)
+        await self._save_artifacts(artifacts)
 
         if result.get("resolved_node") is None:
             print(result["message"])
             return 1
-
-        # print(ErrorAnalyzer.render_chain_text(result))
-        # print(artifacts.get("prompt", ""))
-
+        
+        # ...
         saved = [os.path.join(self.logs_dir, name) for name in
                  ("index.json", "graph.json", "last_error_analysis.json",
                   "graph_view.html", "llm_prompt.md")]
@@ -182,15 +187,15 @@ async def main() -> int:
         return 2
 
     try:
-        error_log = ErrorLoader.from_file(error_log_path)
+        error_log = await ErrorLoader.from_file(error_log_path)
     except (OSError, ValueError) as exc:
         sys.stderr.write(f"Ошибка чтения лога: {exc}\n")
         return 2
 
     job = AnalyzeJob(project_root, error_log, logs_dir=logs_dir,
                      extra_ignore_dirs=settings.analysis.EXTRA_IGNORE_DIRS)
-    return job.run()
+    return await job.run()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    asyncio.run(main())
