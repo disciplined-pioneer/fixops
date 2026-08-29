@@ -166,11 +166,9 @@ class AnalyzeJob:
         return 0
 
 
-def main() -> int:
-    # --- КОНФИГУРАЦИЯ ---
-    # Укажите здесь путь к папке проекта, который нужно проанализировать
+async def main() -> int:
+
     project_path = "sample_app"
-    # --------------------
 
     project_root = os.path.abspath(project_path)
     error_log_path = os.path.join(project_root, "logs", "app.log")
