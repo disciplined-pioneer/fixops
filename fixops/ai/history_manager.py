@@ -3,7 +3,7 @@
 """
 
 from typing import Literal, Optional
-from db.redis.models.models import MessageAI
+from db.redis.models.models import ChatMessage
 
 
 class HistoryManager:
@@ -30,7 +30,7 @@ class HistoryManager:
         :return: Список сообщений в формате модели
         """
         # Запрашиваем сообщения по session_id
-        messages = await MessageAI.filter(session_id=str(session_id))
+        messages = await ChatMessage.filter(session_id=str(session_id))
 
         # Сортируем по хронологии
         messages.sort(key=lambda x: x.created_at)
@@ -51,23 +51,23 @@ class HistoryManager:
         return history
 
     @staticmethod
-    async def save_message(session_id: str | int, role: str, content: str) -> MessageAI:
+    async def save_message(session_id: str | int, role: str, content: str) -> ChatMessage:
         """
         Сохраняет сообщение в историю.
 
         :param session_id: Идентификатор чата/сессии
         :param role: Роль ("user" или "assistant"/"model")
         :param content: Текст сообщения
-        :return: Созданная запись MessageAI
+        :return: Созданная запись ChatMessage
         """
-        return await MessageAI.create(
+        return await ChatMessage.create(
             session_id=str(session_id),
             role=role,
             content=content
         )
 
     @staticmethod
-    def _format_openai(msg: MessageAI) -> dict:
+    def _format_openai(msg: ChatMessage) -> dict:
         """Форматирует сообщение для OpenAI / DeepSeek API"""
         role = "assistant" if msg.role in ("assistant", "model") else "user"
         return {
@@ -76,7 +76,7 @@ class HistoryManager:
         }
 
     @staticmethod
-    def _format_gemini(msg: MessageAI) -> dict:
+    def _format_gemini(msg: ChatMessage) -> dict:
         """Форматирует сообщение для Google Gemini API"""
         role = "model" if msg.role in ("assistant", "model") else "user"
         return {

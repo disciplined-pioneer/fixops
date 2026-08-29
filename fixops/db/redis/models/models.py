@@ -19,6 +19,8 @@ class CustomRedisOmConfig(RedisOmConfig):
 class ModelAdmin(HashModel):
     """Базовый класс с CRUD-операциями для моделей Redis-OM."""
 
+    pk: str | None = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+
     @classmethod
     async def create(cls, ttl: int | None = None, **kwargs) -> Self:
         """
@@ -97,15 +99,15 @@ class ModelAdmin(HashModel):
         return bool(res)
 
 
-class MessageAI(ModelAdmin):
+class ChatMessage(ModelAdmin, index=True):
     """Хранение сообщений с ИИ."""
 
-    pk: str | None = Field(default_factory=lambda: str(uuid4()))
+    pk: str | None = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     session_id: str = Field(index=True, description="ID чата или сессии")
     role: str = Field(index=True, description="Роль отправителя: user, assistant, system")
     content: str = Field(description="Текст сообщения")
     created_at: datetime = Field(
-        default_factory=now_moscow(),
+        default_factory=now_moscow,
         index=True,
         description="Время создания сообщения (московское)"
     )

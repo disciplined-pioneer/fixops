@@ -104,7 +104,7 @@ class AnalyzeJob:
         """Возвращает результат анализа + артефакты для сохранения."""
         indexer = ProjectIndexer()
         ignore_dirs = ProjectIndexer.IGNORE_DIRS + self.extra_ignore_dirs
-        
+
         modules = await indexer.scan(self.project_root, ignore_dirs=ignore_dirs)
 
         idx = ProjectIndex(modules)
@@ -143,7 +143,7 @@ class AnalyzeJob:
             async with asyncio.Lock(): # Simple lock for file writing
                 with open(os.path.join(self.logs_dir, "llm_prompt.md"), "w", encoding="utf-8") as f:
                     f.write(str(artifacts["prompt"]))
-        
+
         await save_html_view(
             artifacts["graph"],
             artifacts["analysis"],
@@ -160,7 +160,7 @@ class AnalyzeJob:
         if result.get("resolved_node") is None:
             print(result["message"])
             return 1
-        
+
         # ...
         saved = [os.path.join(self.logs_dir, name) for name in
                  ("index.json", "graph.json", "last_error_analysis.json",
