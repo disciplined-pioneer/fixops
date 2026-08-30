@@ -116,7 +116,7 @@ class AnalyzeJob:
 
         final_state = await self.workflow.ainvoke(initial_state)
 
-        # Mapping result back to original artifact format for saver
+        # Отображение результата обратно в исходный формат артефакта для экономии времени
         return {
             "index": final_state["indexer"].to_dict(final_state["modules"]), # Используем indexer для генерации dict
             "graph": final_state["graph"].to_dict(),
@@ -154,17 +154,16 @@ class AnalyzeJob:
         result = artifacts["analysis"]
 
         await self._save_artifacts(artifacts)
-
         if result.get("resolved_node") is None:
             print(result["message"])
             return 1
 
-        saved = [os.path.join(self.logs_dir, name) for name in
-                 ("index.json", "graph.json", "last_error_analysis.json",
-                  "graph_view.html", "llm_prompt.md")]
-        print("\nСохранено в " + self.logs_dir + ":")
-        for path in saved:
-            print(f"  - {path}")
+        # saved = [os.path.join(self.logs_dir, name) for name in
+        #          ("index.json", "graph.json", "last_error_analysis.json",
+        #           "graph_view.html", "llm_prompt.md")]
+        # print("\nСохранено в " + self.logs_dir + ":")
+        # for path in saved:
+        #     print(f"  - {path}")
         return 0
 
 
