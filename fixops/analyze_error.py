@@ -105,13 +105,31 @@ class AnalyzeJob:
             "error_log": self.error_log,
             "logs_dir": self.logs_dir,
             "extra_ignore_dirs": self.extra_ignore_dirs,
+
+            "session_id": None,
+
             "modules": None,
-            "indexer": None, # Добавлено
+            "indexer": None,
             "index": None,
             "graph": None,
             "analysis_result": {},
+
             "llm_context": None,
-            "llm_prompt": ""
+            "llm_prompt": "",
+            "llm_response": "",
+
+            "fixed_file": None,
+            "fix_applied": False,
+            "fix_error": None,
+
+            "test_command": [],
+            "tests_passed": False,
+            "test_return_code": None,
+            "test_stdout": "",
+            "test_stderr": "",
+
+            "fix_attempt": 0,
+            "max_fix_attempts": 3,
         }
 
         final_state = await self.workflow.ainvoke(initial_state)
@@ -157,13 +175,6 @@ class AnalyzeJob:
         if result.get("resolved_node") is None:
             print(result["message"])
             return 1
-
-        # saved = [os.path.join(self.logs_dir, name) for name in
-        #          ("index.json", "graph.json", "last_error_analysis.json",
-        #           "graph_view.html", "llm_prompt.md")]
-        # print("\nСохранено в " + self.logs_dir + ":")
-        # for path in saved:
-        #     print(f"  - {path}")
         return 0
 
 

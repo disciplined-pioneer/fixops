@@ -1,3 +1,6 @@
+import os
+import json
+
 from uuid import uuid4
 from typing import TypedDict, Dict, Any
 from langgraph.graph import StateGraph, END
@@ -52,17 +55,23 @@ class FixOpsState(TypedDict):
     fix_attempt: int
     max_fix_attempts: int
 
+
 # Индексация файлов и структуры проекта
 async def indexer_node(state: FixOpsState):
-    indexer = ProjectIndexer()
 
     # Объединяем стандартные и дополнительные директории для игнорирования
+    indexer = ProjectIndexer()
     ignore_dirs = ProjectIndexer.IGNORE_DIRS + state["extra_ignore_dirs"]
 
     modules = await indexer.scan(
         state["project_root"],
         ignore_dirs=ignore_dirs
     )
+
+    index = indexer.to_dict(modules)
+    os.makedirs(state["logs_dir"], exist_ok=True)
+    with open(os.path.join(state["logs_dir"], "index.json"), "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=2)
 
     return {
         "modules": modules,
@@ -72,8 +81,12 @@ async def indexer_node(state: FixOpsState):
 
 # Построение индекса проекта и графа вызовов
 async def graph_builder_node(state: FixOpsState):
+
     idx = ProjectIndex(state["modules"])
     graph = await GraphBuilder(CallResolver(idx)).build(idx)
+
+    with open(os.path.join(state["logs_dir"], "graph.json"), "w", encoding="utf-8") as f:
+        json.dump(graph.to_dict(), f, ensure_ascii=False, indent=2)
 
     return {
         "index": idx,
@@ -83,11 +96,11 @@ async def graph_builder_node(state: FixOpsState):
 
 # Поиск проблемного участка кода по логу ошибки
 async def error_analyzer_node(state: FixOpsState):
+
     analyzer = ErrorAnalyzer(
         state["index"],
         state["graph"]
     )
-
     result = await analyzer.analyze_error(state["error_log"])
 
     return {
@@ -97,6 +110,7 @@ async def error_analyzer_node(state: FixOpsState):
 
 # Подготовка релевантного контекста и prompt для LLM
 async def context_builder_node(state: FixOpsState):
+
     ctx = await ContextBuilder(
         state["project_root"]
     ).build_llm_context(
@@ -114,13 +128,39 @@ async def context_builder_node(state: FixOpsState):
 
 # Отправляет prompt в LLM
 async def handle_fix_request(state: FixOpsState):
-    session_id = state.get("session_id")
 
+    session_id = state.get("session_id")
     if session_id is None:
         session_id = uuid4().hex
 
     handler = DeepSeekHandler(session_id=session_id)
-    response = await handler.generate_response(user_message=state["llm_prompt"])
+    #response = await handler.generate_response(user_message=state["llm_prompt"])
+    response = """
+    {
+      "id": "24778070-1c36-4ae0-a4bd-870afc7fc13e",
+      "object": "chat.completion",
+      "created": 1753000000,
+      "model": "deepseek-v4-flash",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "Hello! How can I help you today?"
+          },
+          "logprobs": null,
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 22,
+        "completion_tokens": 29,
+        "total_tokens": 51,
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 22
+      }
+    }
+    """
 
     return {
         "session_id": session_id,
@@ -150,6 +190,7 @@ async def apply_fix_node(state: FixOpsState):
 
 # Запускает тесты проекта
 async def run_tests_node(state: FixOpsState):
+
     executor = FixExecutor(project_root=state["project_root"])
     result = executor.run_tests(command=state.get("test_command", ["pytest"]))
 
@@ -163,6 +204,7 @@ async def run_tests_node(state: FixOpsState):
 
 # Формирует prompt для повторного исправления
 async def prepare_retry_node(state: FixOpsState):
+
     attempt = state.get("fix_attempt", 0) + 1
     prompt = f"""
         Предыдущее исправление не прошло тесты.
@@ -197,6 +239,7 @@ async def prepare_retry_node(state: FixOpsState):
 # --- Роутер ---
 # Решает, продолжать ли workflow после анализа ошибки
 def should_continue_to_context(state: FixOpsState):
+
     if state["analysis_result"].get("resolved_node") is None:
         return "end"
 
@@ -205,7 +248,12 @@ def should_continue_to_context(state: FixOpsState):
 
 # Решает, нужно ли запускать тесты
 def should_run_tests(state: FixOpsState):
+
     if not state.get("fix_applied", False):
+        attempt = state.get("fix_attempt", 0)
+        max_attempts = state.get("max_fix_attempts", 3)
+        if attempt >= max_attempts:
+            return "failed"
         return "fix_error"
     return "run_tests"
 
@@ -272,6 +320,7 @@ def create_workflow():
         {
             "run_tests": "run_tests",
             "fix_error": "prepare_retry",
+            "failed": END,
         },
     )
 
