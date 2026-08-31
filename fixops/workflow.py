@@ -145,7 +145,7 @@ async def handle_fix_request(state: FixOpsState):
     if session_id is None:
         session_id = uuid4().hex
 
-    handler = DeepSeekHandler(session_id=session_id)
+    # handler = DeepSeekHandler(session_id=session_id)
     #response = await handler.generate_response(user_message=state["llm_prompt"])
     from pathlib import Path
     content = Path(r"D:\Programs\fixops-code-intel\fix.txt").read_text(encoding="utf-8")
@@ -180,13 +180,23 @@ async def handle_fix_request(state: FixOpsState):
     }
 
 
-# Применяет исправление из ответа LLM
+    # Применяет исправление из ответа LLM
 @log_execution(event="workflow_step", operation="apply_fix")
 async def apply_fix_node(state: FixOpsState):
 
+    # Пытаемся распарсить JSON, если LLM вернула ответ в формате OpenAI
+    try:
+        data = json.loads(state['llm_response'])
+        if "choices" in data:
+            content = data["choices"][0]["message"]["content"]
+        else:
+            content = state['llm_response']
+    except json.JSONDecodeError:
+        content = state['llm_response']
+
     executor = FixExecutor(project_root=state["project_root"])
     try:
-        file_path, changed = executor.apply_fix(state["llm_response"])
+        file_path, changed = executor.apply_fix(content)
 
         return {
             "fixed_file": file_path,
@@ -205,8 +215,9 @@ async def apply_fix_node(state: FixOpsState):
 @log_execution(event="workflow_step", operation="run_tests")
 async def run_tests_node(state: FixOpsState):
 
+    command = state.get("test_command") or ["pytest"]
     executor = FixExecutor(project_root=state["project_root"])
-    result = executor.run_tests(command=state.get("test_command", ["pytest"]))
+    result = executor.run_tests(command=command)
 
     return {
         "tests_passed": result.success,
