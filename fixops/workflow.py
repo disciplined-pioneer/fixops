@@ -15,6 +15,9 @@ from ai.deepseek import DeepSeekHandler
 from code_intel.executor import FixExecutor
 
 
+from core.logging import get_logger
+from core.decorators import log_execution
+
 # Общее состояние, которое передаётся между узлами графа
 class FixOpsState(TypedDict):
 
@@ -57,6 +60,7 @@ class FixOpsState(TypedDict):
 
 
 # Индексация файлов и структуры проекта
+@log_execution(event="workflow_step", operation="indexer")
 async def indexer_node(state: FixOpsState):
 
     # Объединяем стандартные и дополнительные директории для игнорирования
@@ -80,8 +84,8 @@ async def indexer_node(state: FixOpsState):
 
 
 # Построение индекса проекта и графа вызовов
+@log_execution(event="workflow_step", operation="graph_builder")
 async def graph_builder_node(state: FixOpsState):
-
     idx = ProjectIndex(state["modules"])
     graph = await GraphBuilder(CallResolver(idx)).build(idx)
 
@@ -95,6 +99,7 @@ async def graph_builder_node(state: FixOpsState):
 
 
 # Поиск проблемного участка кода по логу ошибки
+@log_execution(event="workflow_step", operation="error_analyzer")
 async def error_analyzer_node(state: FixOpsState):
 
     analyzer = ErrorAnalyzer(
@@ -109,6 +114,7 @@ async def error_analyzer_node(state: FixOpsState):
 
 
 # Подготовка релевантного контекста и prompt для LLM
+@log_execution(event="workflow_step", operation="context_builder")
 async def context_builder_node(state: FixOpsState):
 
     ctx = await ContextBuilder(
@@ -127,6 +133,7 @@ async def context_builder_node(state: FixOpsState):
 
 
 # Отправляет prompt в LLM
+@log_execution(event="workflow_step", operation="llm")
 async def handle_fix_request(state: FixOpsState):
 
     session_id = state.get("session_id")
@@ -169,6 +176,7 @@ async def handle_fix_request(state: FixOpsState):
 
 
 # Применяет исправление из ответа LLM
+@log_execution(event="workflow_step", operation="apply_fix")
 async def apply_fix_node(state: FixOpsState):
 
     executor = FixExecutor(project_root=state["project_root"])
@@ -189,6 +197,7 @@ async def apply_fix_node(state: FixOpsState):
 
 
 # Запускает тесты проекта
+@log_execution(event="workflow_step", operation="run_tests")
 async def run_tests_node(state: FixOpsState):
 
     executor = FixExecutor(project_root=state["project_root"])
@@ -203,6 +212,7 @@ async def run_tests_node(state: FixOpsState):
 
 
 # Формирует prompt для повторного исправления
+@log_execution(event="workflow_step", operation="prepare_retry")
 async def prepare_retry_node(state: FixOpsState):
 
     attempt = state.get("fix_attempt", 0) + 1
