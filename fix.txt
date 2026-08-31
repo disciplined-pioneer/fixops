@@ -1,0 +1,87 @@
+```fix
+FILE: services/pricing.py
+<<<<<<< SEARCH
+    def calculate_total(self, items):
+        """Рассчитывает общую стоимость переданных позиций заказа."""
+        repo = InventoryRepository()
+        total = 0.0
+        for item in items:
+            product = repo.get(item["sku"])
+            total += product.price * item["qty"]
+        return total
+=======
+    def calculate_total(self, items):
+        """Рассчитывает общую стоимость переданных позиций заказа."""
+        repo = InventoryRepository()
+        total = 0.0
+        for item in items:
+            product = repo.get(item["sku"])
+            if product is None:
+                raise ValueError(f"Product with SKU '{item['sku']}' not found")
+            total += product.price * item["qty"]
+        return total
+>>>>>>> REPLACE
+```
+
+```test
+FILE: tests/test_pricing.py
+import pytest
+from services.pricing import PricingService
+
+
+class FakeProduct:
+    def __init__(self, sku, price):
+        self.sku = sku
+        self.price = price
+
+
+class FakeInventoryRepository:
+    def __init__(self, inventory=None):
+        self.inventory = inventory or {}
+
+    def get(self, sku):
+        return self.inventory.get(sku)
+
+
+def test_calculate_total_success(monkeypatch):
+    fake_repo = FakeInventoryRepository({
+        "SKU001": FakeProduct("SKU001", 10.0),
+        "SKU002": FakeProduct("SKU002", 15.5),
+    })
+
+    def mock_repo_init(self):
+        self.inventory = fake_repo.inventory
+
+    def mock_repo_get(self, sku):
+        return fake_repo.get(sku)
+
+    monkeypatch.setattr("services.pricing.InventoryRepository", lambda: fake_repo)
+    monkeypatch.setattr(fake_repo, "get", mock_repo_get)
+
+    service = PricingService()
+    items = [{"sku": "SKU001", "qty": 2}, {"sku": "SKU002", "qty": 3}]
+    result = service.calculate_total(items)
+
+    assert result == 2 * 10.0 + 3 * 15.5
+
+
+def test_calculate_total_sku_not_found(monkeypatch):
+    fake_repo = FakeInventoryRepository({
+        "SKU001": FakeProduct("SKU001", 10.0),
+    })
+
+    def mock_repo_init(self):
+        self.inventory = fake_repo.inventory
+
+    def mock_repo_get(self, sku):
+        return fake_repo.get(sku)
+
+    monkeypatch.setattr("services.pricing.InventoryRepository", lambda: fake_repo)
+    monkeypatch.setattr(fake_repo, "get", mock_repo_get)
+
+    service = PricingService()
+    items = [{"sku": "SKU001", "qty": 1}, {"sku": "SKU999", "qty": 1}]
+
+    with pytest.raises(ValueError, match="Product with SKU 'SKU999' not found"):
+        service.calculate_total(items)
+```

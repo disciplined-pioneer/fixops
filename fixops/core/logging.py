@@ -35,7 +35,7 @@ os.makedirs(LOGS_DIR, exist_ok=True)
 logger.remove()
 
 
-if ENV == "production":
+if settings.logging.ENV == "production":
 
     # Production:
     # JSON -> stdout -> Docker / Kubernetes / FixOps

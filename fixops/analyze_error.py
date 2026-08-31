@@ -155,10 +155,6 @@ class AnalyzeJob:
         await self._write_json(os.path.join(self.logs_dir, "index.json"), artifacts["index"])
         await self._write_json(os.path.join(self.logs_dir, "graph.json"), artifacts["graph"])
         await self._write_json(os.path.join(self.logs_dir, "last_error_analysis.json"), artifacts["analysis"])
-        if artifacts.get("prompt"):
-            async with asyncio.Lock(): # Simple lock for file writing
-                with open(os.path.join(self.logs_dir, "llm_prompt.md"), "w", encoding="utf-8") as f:
-                    f.write(str(artifacts["prompt"]))
 
         await save_html_view(
             artifacts["graph"],

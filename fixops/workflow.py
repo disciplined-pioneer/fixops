@@ -126,6 +126,11 @@ async def context_builder_node(state: FixOpsState):
 
     prompt = ContextBuilder.render_llm_prompt(ctx)
 
+    # Сохраняем начальный промпт
+    prompt_path = os.path.join(state["logs_dir"], "llm_prompt.md")
+    with open(prompt_path, "w", encoding="utf-8") as f:
+        f.write(prompt)
+
     return {
         "llm_context": ctx,
         "llm_prompt": prompt
@@ -142,32 +147,32 @@ async def handle_fix_request(state: FixOpsState):
 
     handler = DeepSeekHandler(session_id=session_id)
     #response = await handler.generate_response(user_message=state["llm_prompt"])
-    response = """
-    {
-      "id": "24778070-1c36-4ae0-a4bd-870afc7fc13e",
-      "object": "chat.completion",
-      "created": 1753000000,
-      "model": "deepseek-v4-flash",
-      "choices": [
-        {
-          "index": 0,
-          "message": {
-            "role": "assistant",
-            "content": "Hello! How can I help you today?"
-          },
-          "logprobs": null,
-          "finish_reason": "stop"
+    from pathlib import Path
+    content = Path(r"D:\Programs\fixops-code-intel\fix.txt").read_text(encoding="utf-8")
+    response = json.dumps({
+        "id": "24778070-1c36-4ae0-a4bd-870afc7fc13e",
+        "object": "chat.completion",
+        "created": 1753000000,
+        "model": "deepseek-v4-flash",
+        "choices": [
+            {
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": content
+                },
+                "logprobs": None,
+                "finish_reason": "stop"
+            }
+        ],
+        "usage": {
+            "prompt_tokens": 22,
+            "completion_tokens": 29,
+            "total_tokens": 51,
+            "prompt_cache_hit_tokens": 0,
+            "prompt_cache_miss_tokens": 22
         }
-      ],
-      "usage": {
-        "prompt_tokens": 22,
-        "completion_tokens": 29,
-        "total_tokens": 51,
-        "prompt_cache_hit_tokens": 0,
-        "prompt_cache_miss_tokens": 22
-      }
-    }
-    """
+    })
 
     return {
         "session_id": session_id,
@@ -214,7 +219,6 @@ async def run_tests_node(state: FixOpsState):
 # Формирует prompt для повторного исправления
 @log_execution(event="workflow_step", operation="prepare_retry")
 async def prepare_retry_node(state: FixOpsState):
-
     attempt = state.get("fix_attempt", 0) + 1
     prompt = f"""
         Предыдущее исправление не прошло тесты.
@@ -239,6 +243,11 @@ async def prepare_retry_node(state: FixOpsState):
         новый код
         >>>>>>> REPLACE
     """
+
+    # Сохраняем промпт в уникальный файл
+    prompt_path = os.path.join(state["logs_dir"], f"llm_prompt_{attempt}.md")
+    with open(prompt_path, "w", encoding="utf-8") as f:
+        f.write(prompt)
 
     return {
         "fix_attempt": attempt,
