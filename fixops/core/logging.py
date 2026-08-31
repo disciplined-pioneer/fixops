@@ -22,16 +22,13 @@ import uuid
 from pathlib import Path
 
 from loguru import logger
+from config import settings
+from config import _REPO_ROOT
 
-
-# Проект: core/logging.py -> корень проекта
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SERVICE_NAME = os.environ.get("APP_SERVICE_NAME", "app-service")
-ENV = os.environ.get("APP_ENV", "production")
-
-# Директория логов: можно переопределить переменной окружения LOG_DIR,
-# по умолчанию — <корень проекта>/logs (там же лежат остальные артефакты пайплайна).
-LOGS_DIR = Path(os.environ.get("LOG_DIR", str(PROJECT_ROOT / "logs")))
+# Директория логов: по умолчанию <корень проекта>/logs
+LOGS_DIR = Path(settings.logging.LOG_DIR)
+if not LOGS_DIR.is_absolute():
+    LOGS_DIR = _REPO_ROOT / LOGS_DIR
 os.makedirs(LOGS_DIR, exist_ok=True)
 
 
@@ -86,8 +83,8 @@ logger.add(
 
 # Базовый логгер
 app_logger = logger.bind(
-    service=SERVICE_NAME,
-    environment=ENV,
+    service=settings.logging.SERVICE_NAME,
+    environment=settings.logging.ENV,
 )
 
 

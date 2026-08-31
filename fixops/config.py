@@ -2,7 +2,9 @@ import os
 from typing import Tuple
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+
 
 class AnalysisConfig(BaseSettings):
     """Конфигурация для анализатора ошибок."""
@@ -21,6 +23,7 @@ class AnalysisConfig(BaseSettings):
         env_file_encoding="utf-8",
     )
 
+
 class DeepSeekConfig(BaseSettings):
     """Конфигурация для DeepSeek API."""
 
@@ -31,6 +34,7 @@ class DeepSeekConfig(BaseSettings):
         env_file=".env",
         extra="ignore"
     )
+
 
 class RedisConfig(BaseSettings):
     """Конфигурация для Redis."""
@@ -54,10 +58,26 @@ class RedisConfig(BaseSettings):
             return f"redis://:{self.PASSWORD}@{self.HOST}:{self.PORT}/{self.NAME}"
         return f"redis://{self.HOST}:{self.PORT}/{self.NAME}"
 
+
+class LoggingConfig(BaseSettings):
+    """Конфигурация логирования."""
+    SERVICE_NAME: str = "fixops"
+    ENV: str = "production"
+    LOG_DIR: str = "logs"  # Относительный путь к папке логов
+
+    model_config = SettingsConfigDict(
+        env_prefix="APP_",
+        env_file=".env",
+        extra="ignore",
+        env_file_encoding="utf-8",
+    )
+
+
 class Settings:
     analysis = AnalysisConfig()
     deepseek = DeepSeekConfig()
     redis = RedisConfig()
+    logging = LoggingConfig()
 
 
 settings = Settings()

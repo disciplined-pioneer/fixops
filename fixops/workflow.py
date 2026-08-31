@@ -2,6 +2,8 @@ import os
 import json
 
 from uuid import uuid4
+from core.decorators import log_execution
+
 from typing import TypedDict, Dict, Any
 from langgraph.graph import StateGraph, END
 
@@ -15,8 +17,6 @@ from ai.deepseek import DeepSeekHandler
 from code_intel.executor import FixExecutor
 
 
-from core.logging import get_logger
-from core.decorators import log_execution
 
 # Общее состояние, которое передаётся между узлами графа
 class FixOpsState(TypedDict):
