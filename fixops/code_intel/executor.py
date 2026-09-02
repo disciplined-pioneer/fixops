@@ -1,4 +1,5 @@
 
+import os
 import re
 import subprocess
 
@@ -101,9 +102,14 @@ class FixExecutor:
         command: list[str],
     ) -> TestResult:
 
+        # Добавляем проект в PYTHONPATH для корректного обнаружения модулей
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(self.project_root)
+
         process = subprocess.run(
             command,
             cwd=self.project_root,
+            env=env,
             capture_output=True,
             text=True,
         )
