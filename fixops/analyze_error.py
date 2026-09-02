@@ -129,7 +129,7 @@ class AnalyzeJob:
             "test_stderr": "",
 
             "fix_attempt": 0,
-            "max_fix_attempts": 3,
+            "max_fix_attempts": settings.analysis.MAX_FIX_ATTEMPTS,
         }
 
         final_state = await self.workflow.ainvoke(initial_state)

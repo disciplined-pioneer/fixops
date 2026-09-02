@@ -15,6 +15,7 @@ class AnalysisConfig(BaseSettings):
     EXTRA_IGNORE_DIRS: Tuple[str, ...] = ()
     LOG_TAIL_LINES: int = 50
     REQUIRED_ERROR_KEYS: Tuple[str, ...] = ("file", "function", "line", "error")
+    MAX_FIX_ATTEMPTS: int = 3
 
     # Современный способ задания настроек источника конфигурации
     model_config = SettingsConfigDict(

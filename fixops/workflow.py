@@ -17,6 +17,8 @@ from ai.deepseek import DeepSeekHandler
 from ai.groq import GroqHandler
 from code_intel.executor import FixExecutor
 
+from config import settings
+
 
 # Общее состояние, которое передаётся между узлами графа
 class FixOpsState(TypedDict):
@@ -259,7 +261,7 @@ def should_run_tests(state: FixOpsState):
 
     if not state.get("fix_applied", False):
         attempt = state.get("fix_attempt", 0)
-        max_attempts = state.get("max_fix_attempts", 5)
+        max_attempts = state.get("max_fix_attempts", settings.analysis.MAX_FIX_ATTEMPTS)
         if attempt >= max_attempts:
             return "failed"
         return "fix_error"
@@ -274,7 +276,7 @@ def should_retry(state: FixOpsState):
         return "success"
 
     attempt = state.get("fix_attempt", 0)
-    max_attempts = state.get("max_fix_attempts", 5)
+    max_attempts = state.get("max_fix_attempts", settings.analysis.MAX_FIX_ATTEMPTS)
 
     # Если достигнут лимит попыток
     if attempt >= max_attempts:
