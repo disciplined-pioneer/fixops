@@ -160,7 +160,7 @@ async def handle_fix_request(state: FixOpsState):
     }
 
 
-    # Применяет исправление из ответа LLM
+# Применяет исправление из ответа LLM
 @log_execution(event="workflow_step", operation="apply_fix")
 async def apply_fix_node(state: FixOpsState):
 
