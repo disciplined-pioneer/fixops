@@ -151,9 +151,7 @@ async def handle_fix_request(state: FixOpsState):
     #handler = DeepSeekHandler(session_id=session_id)
     handler = GroqHandler(session_id=session_id)
     content = await handler.generate_response(user_message=state["llm_prompt"])
-    print(content)
-    #from pathlib import Path
-    #content = Path(r"D:\Programs\fixops-code-intel\fix.txt").read_text(encoding="utf-8")
+    #print(content)
 
     return {
         "session_id": session_id,
