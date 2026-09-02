@@ -190,6 +190,10 @@ async def apply_fix_node(state: FixOpsState):
         }
 
 
+import logging
+# Настройка логгирования
+logger = logging.getLogger(__name__)
+
 # Запускает тесты проекта
 @log_execution(event="workflow_step", operation="run_tests")
 async def run_tests_node(state: FixOpsState):
@@ -199,9 +203,9 @@ async def run_tests_node(state: FixOpsState):
     result = executor.run_tests(command=command)
 
     if result.success:
-        print(f"✅ TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
+        logger.info(f"✅ TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
     else:
-        print(f"❌ TESTS FAILED: \n{result.stderr or result.stdout}")
+        logger.error(f"❌ TESTS FAILED: \n{result.stderr or result.stdout}")
 
     return {
         "tests_passed": result.success,
@@ -282,7 +286,7 @@ def should_retry(state: FixOpsState):
 
     # Если ошибка инфраструктуры — завершаем, так как ИИ это не исправит
     if state.get("test_result_type") == "INFRA_FAILURE":
-        print("Infrastructure failure detected, stopping.")
+        logger.error("Infrastructure failure detected, stopping.")
         return "failed"
 
     attempt = state.get("fix_attempt", 0)
