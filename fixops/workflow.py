@@ -52,6 +52,7 @@ class FixOpsState(TypedDict):
     # Результат тестирования
     test_command: list[str]
     tests_passed: bool
+    reproduction_passed: bool  # НОВОЕ: результат запуска reproduce.py
     test_return_code: int | None
     test_stdout: str
     test_stderr: str
@@ -150,7 +151,14 @@ async def handle_fix_request(state: FixOpsState):
 
     #handler = DeepSeekHandler(session_id=session_id)
     handler = GroqHandler(session_id=session_id)
-    content = await handler.generate_response(user_message=state["llm_prompt"])
+    try:
+        content = await handler.generate_response(user_message=state["llm_prompt"])
+    except Exception as e:
+        logger.error(f"LLM request failed: {e}")
+        return {
+            "session_id": session_id,
+            "llm_response": json.dumps({"error": str(e)}),
+        }
     #print(content)
 
     return {
@@ -194,6 +202,13 @@ import logging
 # Настройка логгирования
 logger = logging.getLogger(__name__)
 
+import sys
+import subprocess
+import asyncio
+import logging
+
+# ... (прочий код)
+
 # Запускает тесты проекта
 @log_execution(event="workflow_step", operation="run_tests")
 async def run_tests_node(state: FixOpsState):
@@ -207,8 +222,22 @@ async def run_tests_node(state: FixOpsState):
     else:
         logger.error(f"❌ TESTS FAILED: \n{result.stderr or result.stdout}")
 
+    # Запуск скрипта воспроизведения (reproduce.py)
+    repro_passed = False
+    repro_script = os.path.join(state["project_root"], "reproduce.py")
+    if os.path.exists(repro_script):
+        # Используем sys.executable для запуска, аналогично pytest
+        proc = await asyncio.to_thread(subprocess.run, [sys.executable, repro_script], 
+                                       cwd=state["project_root"], capture_output=True, text=True)
+        repro_passed = (proc.returncode == 0)
+        if repro_passed:
+            logger.info("✅ REPRODUCTION PASSED")
+        else:
+            logger.error(f"❌ REPRODUCTION FAILED: \n{proc.stderr or proc.stdout}")
+
     return {
         "tests_passed": result.success,
+        "reproduction_passed": repro_passed,
         "test_return_code": result.return_code,
         "test_stdout": result.stdout,
         "test_stderr": result.stderr,
@@ -280,8 +309,8 @@ def should_run_tests(state: FixOpsState):
 # Решает, завершить работу или повторить исправление
 def should_retry(state: FixOpsState):
 
-    # Если тесты прошли
-    if state.get("tests_passed", False):
+    # Успех только если и юнит-тесты прошли, и реальный баг исправлен (репродукция прошла)
+    if state.get("tests_passed", False) and state.get("reproduction_passed", False):
         return "success"
 
     # Если ошибка инфраструктуры — завершаем, так как ИИ это не исправит
