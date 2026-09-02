@@ -6,7 +6,7 @@ FILE: services/pricing.py
         repo = InventoryRepository()
         total = 0.0
         for item in items:
-            product = repo.get(item["sku"])
+            product: Any = repo.get(item["sku"])
             total += product.price * item["qty"]
         return total
 =======
@@ -15,7 +15,7 @@ FILE: services/pricing.py
         repo = InventoryRepository()
         total = 0.0
         for item in items:
-            product = repo.get(item["sku"])
+            product: Any = repo.get(item["sku"])
             if product is None:
                 raise ValueError(f"Product with SKU '{item['sku']}' not found")
             total += product.price * item["qty"]
