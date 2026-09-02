@@ -127,6 +127,7 @@ class AnalyzeJob:
             "test_return_code": None,
             "test_stdout": "",
             "test_stderr": "",
+            "test_result_type": None,
 
             "fix_attempt": 0,
             "max_fix_attempts": settings.analysis.MAX_FIX_ATTEMPTS,
