@@ -198,6 +198,11 @@ async def run_tests_node(state: FixOpsState):
     executor = FixExecutor(project_root=state["project_root"])
     result = executor.run_tests(command=command)
 
+    if result.success:
+        print(f"✅ TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
+    else:
+        print(f"❌ TESTS FAILED: \n{result.stderr or result.stdout}")
+
     return {
         "tests_passed": result.success,
         "test_return_code": result.return_code,
