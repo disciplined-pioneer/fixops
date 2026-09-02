@@ -121,7 +121,10 @@ class FixExecutor:
         elif process.returncode == 1:
             result_type = "CODE_FAILURE"
         else:
+            # Коды 2 (collection error) и другие - это инфраструктура
             result_type = "INFRA_FAILURE"
+            print(f"DEBUG: Infrastructure Failure detected. Pytest returncode: {process.returncode}")
+            print(f"DEBUG: Stderr: {process.stderr}")
 
         return TestResult(
             success=process.returncode == 0,
