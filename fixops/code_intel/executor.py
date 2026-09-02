@@ -26,18 +26,19 @@ class FixExecutor:
         response: str,
     ) -> tuple[str, bool]:
 
-        match = re.search(
+        # 1. Применяем fix
+        fix_match = re.search(
             r"```fix\s*(.*?)```",
             response,
             re.DOTALL,
         )
 
-        if not match:
+        if not fix_match:
             raise ValueError(
                 "LLM response does not contain ```fix block"
             )
 
-        fix_block = match.group(1)
+        fix_block = fix_match.group(1)
 
         match = re.search(
             r"FILE:\s*(.+?)\n"
@@ -56,9 +57,7 @@ class FixExecutor:
             )
 
         file_path = match.group(1).strip()
-
         search = match.group(2)
-
         replace = match.group(3)
 
         path = self.project_root / file_path
@@ -68,34 +67,31 @@ class FixExecutor:
                 f"File not found: {file_path}"
             )
 
-        content = path.read_text(
-            encoding="utf-8"
-        )
+        content = path.read_text(encoding="utf-8")
 
-        # Защита от неправильного SEARCH
         if search not in content:
-            raise ValueError(
-                f"SEARCH block not found in {file_path}"
-            )
+            raise ValueError(f"SEARCH block not found in {file_path}")
 
-        # Очень важная проверка.
-        # Нельзя молча заменить несколько одинаковых блоков.
         if content.count(search) > 1:
-            raise ValueError(
-                f"SEARCH block appears multiple times "
-                f"in {file_path}"
-            )
+            raise ValueError(f"SEARCH block appears multiple times in {file_path}")
 
-        new_content = content.replace(
-            search,
-            replace,
-            1,
-        )
+        new_content = content.replace(search, replace, 1)
+        path.write_text(new_content, encoding="utf-8")
 
-        path.write_text(
-            new_content,
-            encoding="utf-8",
+        # 2. Применяем test (если есть)
+        test_match = re.search(
+            r"```test\s*(.*?)```",
+            response,
+            re.DOTALL,
         )
+        if test_match:
+            test_block = test_match.group(1)
+            file_match = re.search(r"FILE:\s*(.+?)\n(.*)", test_block, re.DOTALL)
+            if file_match:
+                test_path = self.project_root / file_match.group(1).strip()
+                test_content = file_match.group(2).strip()
+                test_path.parent.mkdir(parents=True, exist_ok=True)
+                test_path.write_text(test_content, encoding="utf-8")
 
         return file_path, True
 
