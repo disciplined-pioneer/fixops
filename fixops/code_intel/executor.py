@@ -103,9 +103,9 @@ class FixExecutor:
         command: list[str],
     ) -> TestResult:
 
-        # Возвращаем PYTHONPATH на родительский каталог, чтобы импорты 'from sample_app...' работали
+        # Добавляем и корень проекта, и его родителя в PYTHONPATH
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(self.project_root.parent)
+        env["PYTHONPATH"] = f"{self.project_root};{self.project_root.parent}"
 
         process = subprocess.run(
             command,
