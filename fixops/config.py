@@ -20,6 +20,7 @@ class AnalysisConfig(BaseSettings):
     # Современный способ задания настроек источника конфигурации
     model_config = SettingsConfigDict(
         env_file=".env",
+        env_prefix="ANALYSIS_",
         extra="ignore",
         env_file_encoding="utf-8",
     )
