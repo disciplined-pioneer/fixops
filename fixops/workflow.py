@@ -55,6 +55,7 @@ class FixOpsState(TypedDict):
     test_return_code: int | None
     test_stdout: str
     test_stderr: str
+    test_result_type: str | None
 
     # Настройки количества попыток
     fix_attempt: int
@@ -204,6 +205,7 @@ async def run_tests_node(state: FixOpsState):
         "test_return_code": result.return_code,
         "test_stdout": result.stdout,
         "test_stderr": result.stderr,
+        "test_result_type": result.result_type,
     }
 
 
@@ -275,8 +277,13 @@ def should_retry(state: FixOpsState):
     if state.get("tests_passed", False):
         return "success"
 
+    # Если ошибка инфраструктуры — завершаем, так как ИИ это не исправит
+    if state.get("test_result_type") == "INFRA_FAILURE":
+        print("Infrastructure failure detected, stopping.")
+        return "failed"
+
     attempt = state.get("fix_attempt", 0)
-    max_attempts = state.get("max_fix_attempts", settings.analysis.MAX_FIX_ATTEMPTS)
+    max_attempts = state.get("max_fix_attempts", 5)
 
     # Если достигнут лимит попыток
     if attempt >= max_attempts:

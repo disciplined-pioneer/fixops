@@ -13,6 +13,7 @@ class TestResult:
     return_code: int
     stdout: str
     stderr: str
+    result_type: str  # 'SUCCESS', 'CODE_FAILURE', 'INFRA_FAILURE'
 
 
 class FixExecutor:
@@ -102,9 +103,9 @@ class FixExecutor:
         command: list[str],
     ) -> TestResult:
 
-        # Добавляем проект в PYTHONPATH для корректного обнаружения модулей
+        # Добавляем родительский каталог проекта в PYTHONPATH для корректного обнаружения пакетов
         env = os.environ.copy()
-        env["PYTHONPATH"] = str(self.project_root)
+        env["PYTHONPATH"] = str(self.project_root.parent)
 
         process = subprocess.run(
             command,
@@ -114,9 +115,18 @@ class FixExecutor:
             text=True,
         )
 
+        # Классификация результата
+        if process.returncode == 0:
+            result_type = "SUCCESS"
+        elif process.returncode == 1:
+            result_type = "CODE_FAILURE"
+        else:
+            result_type = "INFRA_FAILURE"
+
         return TestResult(
             success=process.returncode == 0,
             return_code=process.returncode,
             stdout=process.stdout,
             stderr=process.stderr,
+            result_type=result_type
         )
