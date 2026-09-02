@@ -13,9 +13,6 @@ class InventoryRepository:
     @log_execution(event="inventory.get")
     def get(self, sku):
         """Получает объект товара по его SKU."""
-        # Баг: для неизвестного SKU метод возвращает None вместо понятной
-        # ошибки. Ниже по стеку (в PricingService.calculate_total) это
-        # всплывёт как AttributeError: 'NoneType' object has no attribute 'price'.
         log = get_logger(event="inventory.get", sku=sku)
         product = _INVENTORY_DB.get(sku)
         if product is None:
