@@ -91,12 +91,15 @@ class ErrorAnalyzer:
 
     @staticmethod
     def _guess_root_cause(callees_chain: list[dict]) -> list[str]:
-        """Простая эвристика: самые дальние листья в цепочке вызовов —
-        первые кандидаты на "настоящий источник проблемы", т.к. именно
-        их возвращаемое значение (например None) чаще всего всплывает
-        выше по стеку в виде AttributeError/TypeError."""
+        """Эвристика: самые дальние листья в цепочке + непосредственные
+        вызовы из проблемной функции — лучшие кандидаты на первопричину."""
         candidates = []
 
+        # 1. Добавляем непосредственные вызовы (они чаще всего источник None или ошибки)
+        for c in callees_chain:
+            candidates.append(c["qualname"])
+
+        # 2. Добавляем листья
         def _leaves(node):
             if not node.get("callees"):
                 candidates.append(node["qualname"])
@@ -106,7 +109,9 @@ class ErrorAnalyzer:
 
         for c in callees_chain:
             _leaves(c)
-        return candidates
+            
+        # Удаляем дубликаты
+        return list(dict.fromkeys(candidates))
 
     @staticmethod
     def render_chain_text(result: dict) -> str:
