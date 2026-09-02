@@ -118,10 +118,12 @@ class FixExecutor:
         # Классификация результата
         if process.returncode == 0:
             result_type = "SUCCESS"
+        elif "ModuleNotFoundError" in process.stderr or "ImportError" in process.stderr:
+            result_type = "INFRA_FAILURE"
+            print(f"DEBUG: Infrastructure Failure detected (Import/Module Error).")
         elif process.returncode == 1:
             result_type = "CODE_FAILURE"
         else:
-            # Коды 2 (collection error) и другие - это инфраструктура
             result_type = "INFRA_FAILURE"
             print(f"DEBUG: Infrastructure Failure detected. Pytest returncode: {process.returncode}")
             print(f"DEBUG: Stderr: {process.stderr}")
