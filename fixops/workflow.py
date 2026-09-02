@@ -259,7 +259,7 @@ def should_run_tests(state: FixOpsState):
 
     if not state.get("fix_applied", False):
         attempt = state.get("fix_attempt", 0)
-        max_attempts = state.get("max_fix_attempts", 3)
+        max_attempts = state.get("max_fix_attempts", 5)
         if attempt >= max_attempts:
             return "failed"
         return "fix_error"
@@ -274,7 +274,7 @@ def should_retry(state: FixOpsState):
         return "success"
 
     attempt = state.get("fix_attempt", 0)
-    max_attempts = state.get("max_fix_attempts", 3)
+    max_attempts = state.get("max_fix_attempts", 5)
 
     # Если достигнут лимит попыток
     if attempt >= max_attempts:
