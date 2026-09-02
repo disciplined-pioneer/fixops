@@ -36,6 +36,18 @@ class DeepSeekConfig(BaseSettings):
     )
 
 
+class GroqSeekConfig(BaseSettings):
+    """Конфигурация для Groq API."""
+
+    TOKEN: str = ''
+
+    model_config = SettingsConfigDict(
+        env_prefix="GROQ_",
+        env_file=".env",
+        extra="ignore"
+    )
+
+
 class RedisConfig(BaseSettings):
     """Конфигурация для Redis."""
 
@@ -76,6 +88,7 @@ class LoggingConfig(BaseSettings):
 class Settings:
     analysis = AnalysisConfig()
     deepseek = DeepSeekConfig()
+    groq = GroqSeekConfig()
     redis = RedisConfig()
     logging = LoggingConfig()
 

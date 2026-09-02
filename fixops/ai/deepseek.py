@@ -15,14 +15,14 @@ class DeepSeekHandler(AIHandler):
     """
 
     def __init__(self, session_id: str, model_name: str = "deepseek-v4-flash"):
-            super().__init__(session_id)
-            self.api_key = settings.deepseek.TOKEN
-            self.model_name = model_name
+        super().__init__(session_id)
+        self.api_key = settings.deepseek.TOKEN
+        self.model_name = model_name
 
-            self.client = AsyncOpenAI(
-                api_key=self.api_key,
-                base_url="https://api.deepseek.com"
-            )
+        self.client = AsyncOpenAI(
+            api_key=self.api_key,
+            base_url="https://api.deepseek.com"
+        )
 
     async def get_history(self) -> list[dict]:
         """

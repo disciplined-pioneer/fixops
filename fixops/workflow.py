@@ -14,8 +14,8 @@ from code_intel.context_builder import ContextBuilder
 from code_intel.resolver import ProjectIndex, CallResolver
 
 from ai.deepseek import DeepSeekHandler
+from ai.groq import GroqHandler
 from code_intel.executor import FixExecutor
-
 
 
 # Общее состояние, которое передаётся между узлами графа
@@ -145,38 +145,16 @@ async def handle_fix_request(state: FixOpsState):
     if session_id is None:
         session_id = uuid4().hex
 
-    # handler = DeepSeekHandler(session_id=session_id)
-    #response = await handler.generate_response(user_message=state["llm_prompt"])
-    from pathlib import Path
-    content = Path(r"D:\Programs\fixops-code-intel\fix.txt").read_text(encoding="utf-8")
-    response = json.dumps({
-        "id": "24778070-1c36-4ae0-a4bd-870afc7fc13e",
-        "object": "chat.completion",
-        "created": 1753000000,
-        "model": "deepseek-v4-flash",
-        "choices": [
-            {
-                "index": 0,
-                "message": {
-                    "role": "assistant",
-                    "content": content
-                },
-                "logprobs": None,
-                "finish_reason": "stop"
-            }
-        ],
-        "usage": {
-            "prompt_tokens": 22,
-            "completion_tokens": 29,
-            "total_tokens": 51,
-            "prompt_cache_hit_tokens": 0,
-            "prompt_cache_miss_tokens": 22
-        }
-    })
+    #handler = DeepSeekHandler(session_id=session_id)
+    handler = GroqHandler(session_id=session_id)
+    content = await handler.generate_response(user_message=state["llm_prompt"])
+    print(content)
+    #from pathlib import Path
+    #content = Path(r"D:\Programs\fixops-code-intel\fix.txt").read_text(encoding="utf-8")
 
     return {
         "session_id": session_id,
-        "llm_response": response,
+        "llm_response": content,
     }
 
 
