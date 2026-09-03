@@ -18,6 +18,7 @@ from ai.groq import GroqHandler
 from code_intel.executor import FixExecutor
 
 from config import settings
+from core.logging import app_logger
 
 
 # Общее состояние, которое передаётся между узлами графа
@@ -154,7 +155,7 @@ async def handle_fix_request(state: FixOpsState):
     try:
         content = await handler.generate_response(user_message=state["llm_prompt"])
     except Exception as e:
-        logger.error(f"LLM request failed: {e}")
+        app_logger.error(f"LLM request failed: {e}")
         return {
             "session_id": session_id,
             "llm_response": json.dumps({"error": str(e)}),
@@ -197,17 +198,9 @@ async def apply_fix_node(state: FixOpsState):
             "fix_error": str(e),
         }
 
-
-import logging
-# Настройка логгирования
-logger = logging.getLogger(__name__)
-
-import sys
 import subprocess
 import asyncio
-import logging
-
-# ... (прочий код)
+import sys
 
 # Запускает тесты проекта
 @log_execution(event="workflow_step", operation="run_tests")
@@ -218,22 +211,22 @@ async def run_tests_node(state: FixOpsState):
     result = executor.run_tests(command=command)
 
     if result.success:
-        logger.info(f"✅ TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
+        app_logger.info(f"✅ TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
     else:
-        logger.error(f"❌ TESTS FAILED: \n{result.stderr or result.stdout}")
+        app_logger.error(f"❌ TESTS FAILED: \n{result.stderr or result.stdout}")
 
     # Запуск скрипта воспроизведения (reproduce.py)
     repro_passed = False
     repro_script = os.path.join(state["project_root"], "reproduce.py")
     if os.path.exists(repro_script):
         # Используем sys.executable для запуска, аналогично pytest
-        proc = await asyncio.to_thread(subprocess.run, [sys.executable, repro_script], 
+        proc = await asyncio.to_thread(subprocess.run, [sys.executable, repro_script],
                                        cwd=state["project_root"], capture_output=True, text=True)
         repro_passed = (proc.returncode == 0)
         if repro_passed:
-            logger.info("✅ REPRODUCTION PASSED")
+            app_logger.info("✅ REPRODUCTION PASSED")
         else:
-            logger.error(f"❌ REPRODUCTION FAILED: \n{proc.stderr or proc.stdout}")
+            app_logger.error(f"❌ REPRODUCTION FAILED: \n{proc.stderr or proc.stdout}")
 
     return {
         "tests_passed": result.success,
@@ -315,7 +308,7 @@ def should_retry(state: FixOpsState):
 
     # Если ошибка инфраструктуры — завершаем, так как ИИ это не исправит
     if state.get("test_result_type") == "INFRA_FAILURE":
-        logger.error("Infrastructure failure detected, stopping.")
+        app_logger.error("Infrastructure failure detected, stopping.")
         return "failed"
 
     attempt = state.get("fix_attempt", 0)
