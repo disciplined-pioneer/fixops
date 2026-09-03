@@ -1,5 +1,8 @@
 import os
+import sys
 import json
+import asyncio
+import subprocess
 
 from uuid import uuid4
 from core.decorators import log_execution
@@ -198,9 +201,6 @@ async def apply_fix_node(state: FixOpsState):
             "fix_error": str(e),
         }
 
-import subprocess
-import asyncio
-import sys
 
 # Запускает тесты проекта
 @log_execution(event="workflow_step", operation="run_tests")
@@ -211,9 +211,9 @@ async def run_tests_node(state: FixOpsState):
     result = executor.run_tests(command=command)
 
     if result.success:
-        app_logger.info(f"✅ TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
+        app_logger.info(f"TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
     else:
-        app_logger.error(f"❌ TESTS FAILED: \n{result.stderr or result.stdout}")
+        app_logger.error(f"TESTS FAILED: \n{result.stderr or result.stdout}")
 
     # Запуск скрипта воспроизведения (reproduce.py)
     repro_passed = False
@@ -224,9 +224,9 @@ async def run_tests_node(state: FixOpsState):
                                        cwd=state["project_root"], capture_output=True, text=True)
         repro_passed = (proc.returncode == 0)
         if repro_passed:
-            app_logger.info("✅ REPRODUCTION PASSED")
+            app_logger.info("REPRODUCTION PASSED")
         else:
-            app_logger.error(f"❌ REPRODUCTION FAILED: \n{proc.stderr or proc.stdout}")
+            app_logger.error(f"REPRODUCTION FAILED: \n{proc.stderr or proc.stdout}")
 
     return {
         "tests_passed": result.success,
