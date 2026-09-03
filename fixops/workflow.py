@@ -56,7 +56,7 @@ class FixOpsState(TypedDict):
     # Результат тестирования
     test_command: list[str]
     tests_passed: bool
-    reproduction_passed: bool  # НОВОЕ: результат запуска reproduce.py
+    reproduction_passed: bool  # Ergebnis запуска reproduce.py
     test_return_code: int | None
     test_stdout: str
     test_stderr: str
@@ -71,7 +71,6 @@ class FixOpsState(TypedDict):
 @log_execution(event="workflow_step", operation="indexer")
 async def indexer_node(state: FixOpsState):
 
-    # Объединяем стандартные и дополнительные директории для игнорирования
     indexer = ProjectIndexer()
     ignore_dirs = ProjectIndexer.IGNORE_DIRS + state["extra_ignore_dirs"]
 
@@ -153,17 +152,15 @@ async def handle_fix_request(state: FixOpsState):
     if session_id is None:
         session_id = uuid4().hex
 
-    #handler = DeepSeekHandler(session_id=session_id)
     handler = GroqHandler(session_id=session_id)
     try:
         content = await handler.generate_response(user_message=state["llm_prompt"])
     except Exception as e:
-        app_logger.error(f"LLM request failed: {e}")
+        app_logger.bind(event="workflow_step", operation="llm").error(f"LLM request failed: {e}")
         return {
             "session_id": session_id,
             "llm_response": json.dumps({"error": str(e)}),
         }
-    #print(content)
 
     return {
         "session_id": session_id,
@@ -175,7 +172,6 @@ async def handle_fix_request(state: FixOpsState):
 @log_execution(event="workflow_step", operation="apply_fix")
 async def apply_fix_node(state: FixOpsState):
 
-    # Пытаемся распарсить JSON, если LLM вернула ответ в формате OpenAI
     try:
         data = json.loads(state['llm_response'])
         if "choices" in data:
@@ -210,23 +206,32 @@ async def run_tests_node(state: FixOpsState):
     executor = FixExecutor(project_root=state["project_root"])
     result = executor.run_tests(command=command)
 
+    # Привязываем контекст event и operation к логгеру, чтобы не провоцировать KeyError
+    logger = app_logger.bind(event="workflow_step", operation="run_tests")
+
     if result.success:
-        app_logger.info(f"TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
+        logger.info(f"TESTS PASSED: {result.stdout.splitlines()[-1] if result.stdout else 'All tests passed'}")
     else:
-        app_logger.error(f"TESTS FAILED: \n{result.stderr or result.stdout}")
+        logger.error(f"TESTS FAILED: \n{result.stderr or result.stdout}")
 
     # Запуск скрипта воспроизведения (reproduce.py)
     repro_passed = False
     repro_script = os.path.join(state["project_root"], "reproduce.py")
     if os.path.exists(repro_script):
-        # Используем sys.executable для запуска, аналогично pytest
-        proc = await asyncio.to_thread(subprocess.run, [sys.executable, repro_script],
-                                       cwd=state["project_root"], capture_output=True, text=True)
+        proc = await asyncio.to_thread(
+            subprocess.run,
+            [sys.executable, repro_script],
+            cwd=state["project_root"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace"
+        )
         repro_passed = (proc.returncode == 0)
         if repro_passed:
-            app_logger.info("REPRODUCTION PASSED")
+            logger.info("REPRODUCTION PASSED")
         else:
-            app_logger.error(f"REPRODUCTION FAILED: \n{proc.stderr or proc.stdout}")
+            logger.error(f"REPRODUCTION FAILED: \n{proc.stderr or proc.stdout}")
 
     return {
         "tests_passed": result.success,
@@ -266,7 +271,6 @@ async def prepare_retry_node(state: FixOpsState):
         >>>>>>> REPLACE
     """
 
-    # Сохраняем промпт в уникальный файл
     prompt_path = os.path.join(state["logs_dir"], f"llm_prompt_{attempt}.md")
     with open(prompt_path, "w", encoding="utf-8") as f:
         f.write(prompt)
@@ -278,7 +282,6 @@ async def prepare_retry_node(state: FixOpsState):
 
 
 # --- Роутер ---
-# Решает, продолжать ли workflow после анализа ошибки
 def should_continue_to_context(state: FixOpsState):
 
     if state["analysis_result"].get("resolved_node") is None:
@@ -287,7 +290,6 @@ def should_continue_to_context(state: FixOpsState):
     return "build_context"
 
 
-# Решает, нужно ли запускать тесты
 def should_run_tests(state: FixOpsState):
 
     if not state.get("fix_applied", False):
@@ -299,22 +301,18 @@ def should_run_tests(state: FixOpsState):
     return "run_tests"
 
 
-# Решает, завершить работу или повторить исправление
 def should_retry(state: FixOpsState):
 
-    # Успех только если и юнит-тесты прошли, и реальный баг исправлен (репродукция прошла)
     if state.get("tests_passed", False) and state.get("reproduction_passed", False):
         return "success"
 
-    # Если ошибка инфраструктуры — завершаем, так как ИИ это не исправит
     if state.get("test_result_type") == "INFRA_FAILURE":
-        app_logger.error("Infrastructure failure detected, stopping.")
+        app_logger.bind(event="workflow_step", operation="router").error("Infrastructure failure detected, stopping.")
         return "failed"
 
     attempt = state.get("fix_attempt", 0)
     max_attempts = state.get("max_fix_attempts", 5)
 
-    # Если достигнут лимит попыток
     if attempt >= max_attempts:
         return "failed"
 
@@ -326,7 +324,6 @@ def create_workflow():
 
     workflow = StateGraph(FixOpsState)
 
-    # Регистрируем узлы
     workflow.add_node("indexer", indexer_node)
     workflow.add_node("graph_builder", graph_builder_node)
     workflow.add_node("error_analyzer", error_analyzer_node)
@@ -336,14 +333,11 @@ def create_workflow():
     workflow.add_node("run_tests", run_tests_node)
     workflow.add_node("prepare_retry", prepare_retry_node)
 
-    # Задаём начальный узел
     workflow.set_entry_point("indexer")
 
-    # Основной pipeline анализа
     workflow.add_edge("indexer", "graph_builder")
     workflow.add_edge("graph_builder", "error_analyzer")
 
-    # Проверяем результат анализа
     workflow.add_conditional_edges(
         "error_analyzer",
         should_continue_to_context,
@@ -353,13 +347,9 @@ def create_workflow():
         },
     )
 
-    # Передаём контекст в LLM
     workflow.add_edge("context_builder", "llm")
-
-    # Применяем исправление после ответа LLM
     workflow.add_edge("llm", "apply_fix")
 
-    # После исправления запускаем тесты
     workflow.add_conditional_edges(
         "apply_fix",
         should_run_tests,
@@ -370,7 +360,6 @@ def create_workflow():
         },
     )
 
-    # Проверяем результат тестов
     workflow.add_conditional_edges(
         "run_tests",
         should_retry,
@@ -381,7 +370,6 @@ def create_workflow():
         },
     )
 
-    # После ошибки повторно отправляем запрос LLM
     workflow.add_edge("prepare_retry", "llm")
 
     return workflow.compile()
