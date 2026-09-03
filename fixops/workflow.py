@@ -90,6 +90,7 @@ async def indexer_node(state: FixOpsState):
     }
 
 
+
 # Построение индекса проекта и графа вызовов
 @log_execution(event="workflow_step", operation="graph_builder")
 async def graph_builder_node(state: FixOpsState):
@@ -103,6 +104,7 @@ async def graph_builder_node(state: FixOpsState):
         "index": idx,
         "graph": graph
     }
+
 
 
 # Поиск проблемного участка кода по логу ошибки
@@ -142,6 +144,7 @@ async def context_builder_node(state: FixOpsState):
         "llm_context": ctx,
         "llm_prompt": prompt
     }
+
 
 
 # Отправляет prompt в LLM
