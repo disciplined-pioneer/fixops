@@ -1,29 +1,23 @@
 """
 core/logging.py — настройка логирования примера проекта через loguru.
-
-Адаптировано под структуру проекта FixOps Code Intelligence:
-
-  - пакет лежит в core/logging.py;
-  - файловый лог пишется в единую директорию логов проекта
-    (по умолчанию <корень проекта>/logs/app.log);
-  - окружение (production/development) переопределяется переменной
-    окружения APP_ENV, по умолчанию — production (JSON в stdout,
-    как и было в исходном core).
-
-Сразу после импорта модуля создаётся директория логов и регистрируются
-два sink-а (консоль и файл). Готовый к использованию логгер — `app_logger`,
-а фабрика `get_logger(event, **context)` добавляет к событию уникальный
-event_id и произвольный контекст.
 """
 
 import os
 import sys
 import uuid
 from pathlib import Path
+from typing import Any, cast
 
 from loguru import logger
-from config import settings
-from config import _REPO_ROOT
+from config import settings, _REPO_ROOT
+
+# Исправление 1: Принудительный UTF-8 для stdout/stderr на Windows
+# Cast к Any убирает ошибку "Cannot access attribute reconfigure for class TextIO"
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        cast(Any, sys.stdout).reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        cast(Any, sys.stderr).reconfigure(encoding="utf-8")
 
 # Директория логов: по умолчанию <корень проекта>/logs
 LOGS_DIR = Path(settings.logging.LOG_DIR)
@@ -31,14 +25,12 @@ if not LOGS_DIR.is_absolute():
     LOGS_DIR = _REPO_ROOT / LOGS_DIR
 os.makedirs(LOGS_DIR, exist_ok=True)
 
-
+# Сбрасываем стандартные хэндлеры
 logger.remove()
 
-
+# Исправление 2: Убран параметр encoding из logger.add(sys.stdout)
 if settings.logging.ENV == "production":
-
-    # Production:
-    # JSON -> stdout -> Docker / Kubernetes / FixOps
+    # Production: JSON -> stdout
     logger.add(
         sys.stdout,
         serialize=True,
@@ -47,11 +39,8 @@ if settings.logging.ENV == "production":
         backtrace=True,
         diagnose=False,
     )
-
 else:
-
-    # Development:
-    # Красивый лог для человека
+    # Development: Красивый цветной лог для консоли
     logger.add(
         sys.stdout,
         format=(
@@ -67,7 +56,7 @@ else:
         diagnose=True,
     )
 
-
+# Для файлового sink параметр encoding корректен
 logger.add(
     str(LOGS_DIR / "app.log"),
     serialize=True,
@@ -78,8 +67,8 @@ logger.add(
     level="INFO",
     backtrace=True,
     diagnose=False,
+    encoding="utf-8",
 )
-
 
 # Базовый логгер
 app_logger = logger.bind(
@@ -88,14 +77,8 @@ app_logger = logger.bind(
 )
 
 
-def get_logger(
-    event: str,
-    **context,
-):
-    """
-    Создаёт logger с контекстом события.
-    """
-
+def get_logger(event: str, **context: Any) -> Any:
+    """Создаёт logger с контекстом события."""
     return app_logger.bind(
         event=event,
         event_id=str(uuid.uuid4()),
