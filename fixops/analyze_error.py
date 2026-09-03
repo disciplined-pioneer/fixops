@@ -124,6 +124,7 @@ class AnalyzeJob:
 
             "test_command": [],
             "tests_passed": False,
+            "reproduction_passed": False,
             "test_return_code": None,
             "test_stdout": "",
             "test_stderr": "",
