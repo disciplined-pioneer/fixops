@@ -46,11 +46,11 @@ class ContextBuilder:
 
     async def _read_source_slice(self, file: str, lineno: int, end_lineno: int, raw: bool = False) -> str:
         path = os.path.join(self.project_root, file)
-        
+
         def _read_file():
             with open(path, "r", encoding="utf-8") as f:
                 return f.readlines()
-        
+
         lines = await asyncio.to_thread(_read_file)
 
         # lineno в AST 1-based
@@ -188,6 +188,10 @@ class ContextBuilder:
         lines.append("2. Верни СТРОГО ДВА БЛОКА КОДА (`fix` и `test`). Никакого текста вне блоков, заголовков, пояснений, слова 'FIX' или 'Фрагмент кода' быть НЕ ДОЛЖНО.")
         lines.append("3. В unit-тесте тестируй зафикшенный метод НАПРЯМУЮ. Для мокинга внешних БД и зависимостей используй ТОЛЬКО `monkeypatch` (без unittest.mock). Покрой как случай с ошибкой, так и успешный сценарий.")
         lines.append("4. Внутри блока `fix` первой строкой ОБЯЗАТЕЛЬНО укажи `FILE: <путь>`. Формат строго следующий:\n")
+        lines.append("5. ПРАВИЛА ОБРАБОТКИ ИСКЛЮЧЕНИЙ:")
+        lines.append("   - НЕ подавляй ошибки через `continue`, `pass` или silent `return None`, если спецификация или логика бизнес-слоя требует выброса исключения.")
+        lines.append("   - Если ресурс/сущность не найдена в репозитории/БД, всегда выбрасывай явное исключение (например, `ValueError`, `KeyError` или доменное исключение).")
+        lines.append("   - Тесты и контракты данных имеют абсолютный приоритет перед замалчиванием ошибок.")
 
         lines.append("```fix")
         lines.append("FILE: <относительный_путь_к_файлу>")
