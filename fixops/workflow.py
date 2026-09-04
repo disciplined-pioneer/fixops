@@ -249,29 +249,36 @@ async def run_tests_node(state: FixOpsState):
 # Формирует prompt для повторного исправления
 @log_execution(event="workflow_step", operation="prepare_retry")
 async def prepare_retry_node(state: FixOpsState):
+
     attempt = state.get("fix_attempt", 0) + 1
     prompt = f"""
         Предыдущее исправление не прошло тесты.
         Попытка: {attempt}
-        Файл:
-        {state.get("fixed_file")}
+        Файл: {state.get("fixed_file")}
+
         Результат тестов:
         STDOUT:
         {state.get("test_stdout")}
         STDERR:
         {state.get("test_stderr")}
-        Код завершения:
-        {state.get("test_return_code")}
-        Проанализируй ошибку тестов и предложи новое исправление.
-        Верни исправление строго в формате:
 
+        ВАЖНО: Если ошибка в тестах связана с тем, что код теперь корректно выбрасывает исключение (например, ValueError, KeyError, NotFound), ты ОБЯЗАН обновить тест, используя конструкцию `with pytest.raises(ОжидаемоеИсключение):`.
+        Не пытайся "починить" тест, удаляя выброс исключения из основного кода, если это соответствует бизнес-логике.
+
+        Верни исправление строго в ДВУХ блоках:
         ```fix
-        FILE: path/to/file.py
+        FILE: <путь_к_файлу>
         <<<<<<< SEARCH
-        старый код
+        <старый код>
         =======
-        новый код
+        <новый код>
         >>>>>>> REPLACE
+        ```
+        ```test
+        FILE: <путь_к_файлу_теста>
+        import pytest
+        # твой обновленный тест, проверяющий как успешный сценарий, так и ожидаемое исключение через pytest.raises
+        ```
     """
 
     prompt_path = os.path.join(state["logs_dir"], f"llm_prompt_{attempt}.md")

@@ -63,7 +63,8 @@ class HistoryManager:
         return await ChatMessage.create(
             session_id=str(session_id),
             role=role,
-            content=content
+            content=content,
+            ttl=86400 # Автоудаление через 24 часа
         )
 
     @staticmethod
