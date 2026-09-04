@@ -32,8 +32,11 @@ from workflow import create_workflow, FixOpsState
 
 
 # Принудительно устанавливаем UTF-8 для стандартного вывода
-sys.stdout.reconfigure(encoding='utf-8')
-sys.stderr.reconfigure(encoding='utf-8')
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 
 
 class ErrorLoader:
