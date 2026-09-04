@@ -23,69 +23,55 @@ class FixExecutor:
         self.project_root = Path(project_root)
 
     # Применяем Fix
-    def apply_fix(
-        self,
-        response: str,
-    ) -> tuple[str, bool]:
+    def apply_fix(self, response: str) -> tuple[str | None, bool]:
 
-        # 1. Применяем fix
-        fix_match = re.search(
-            r"```fix\s*(.*?)```",
-            response,
-            re.DOTALL,
-        )
+        # Ищем ВСЕ блоки fix, а не только первый
+        fix_blocks = re.findall(r"```fix\s*(.*?)```", response, re.DOTALL)
 
-        if not fix_match:
-            raise ValueError(
-                "LLM response does not contain ```fix block"
+        if not fix_blocks:
+            raise ValueError("LLM response does not contain ```fix block")
+
+        any_changed = False
+        last_file_path = None
+
+        for fix_block in fix_blocks:
+            match = re.search(
+                r"FILE:\s*(.+?)\n"
+                r"<<<<<<< SEARCH\n"
+                r"(.*?)"
+                r"\n=======\n"
+                r"(.*?)"
+                r"\n>>>>>>> REPLACE",
+                fix_block,
+                re.DOTALL,
             )
 
-        fix_block = fix_match.group(1)
+            if not match:
+                continue # Пропускаем некорректно сформированные блоки
 
-        match = re.search(
-            r"FILE:\s*(.+?)\n"
-            r"<<<<<<< SEARCH\n"
-            r"(.*?)"
-            r"\n=======\n"
-            r"(.*?)"
-            r"\n>>>>>>> REPLACE",
-            fix_block,
-            re.DOTALL,
-        )
+            file_path = match.group(1).strip()
+            search = match.group(2)
+            replace = match.group(3)
 
-        if not match:
-            raise ValueError(
-                "Invalid fix format"
-            )
+            path = self.project_root / file_path
 
-        file_path = match.group(1).strip()
-        search = match.group(2)
-        replace = match.group(3)
+            if not path.exists():
+                print(f"Warning: File not found, skipping: {file_path}")
+                continue
 
-        path = self.project_root / file_path
+            content = path.read_text(encoding="utf-8")
 
-        if not path.exists():
-            raise FileNotFoundError(
-                f"File not found: {file_path}"
-            )
+            if search not in content:
+                print(f"Warning: SEARCH block not found in {file_path}, skipping.")
+                continue
 
-        content = path.read_text(encoding="utf-8")
+            new_content = content.replace(search, replace, 1)
+            path.write_text(new_content, encoding="utf-8")
+            any_changed = True
+            last_file_path = file_path
 
-        if search not in content:
-            raise ValueError(f"SEARCH block not found in {file_path}")
-
-        if content.count(search) > 1:
-            raise ValueError(f"SEARCH block appears multiple times in {file_path}")
-
-        new_content = content.replace(search, replace, 1)
-        path.write_text(new_content, encoding="utf-8")
-
-        # 2. Применяем test (если есть)
-        test_match = re.search(
-            r"```test\s*(.*?)```",
-            response,
-            re.DOTALL,
-        )
+        # Обработка тестов (остается как была, но можно тоже сделать findall, если ИИ генерирует несколько тестов)
+        test_match = re.search(r"```test\s*(.*?)```", response, re.DOTALL)
         if test_match:
             test_block = test_match.group(1)
             file_match = re.search(r"FILE:\s*(.+?)\n(.*)", test_block, re.DOTALL)
@@ -94,8 +80,9 @@ class FixExecutor:
                 test_content = file_match.group(2).strip()
                 test_path.parent.mkdir(parents=True, exist_ok=True)
                 test_path.write_text(test_content, encoding="utf-8")
+                any_changed = True
 
-        return file_path, True
+        return last_file_path, any_changed
 
     # Запуск тестов
     def run_tests(

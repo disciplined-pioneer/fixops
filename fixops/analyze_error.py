@@ -31,6 +31,11 @@ from code_intel.html_view import save_html_view
 from workflow import create_workflow, FixOpsState
 
 
+# Принудительно устанавливаем UTF-8 для стандартного вывода
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+
+
 class ErrorLoader:
     """Читает последнюю ERROR-запись из хвоста лог-файла проекта (loguru, serialize=True).
 
