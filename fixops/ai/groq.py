@@ -14,7 +14,7 @@ class GroqHandler(AIHandler):
     Обработчик для прямого общения с моделями Groq.
     """
 
-    def __init__(self, session_id: str, model_name: str = "openai/gpt-oss-20b"):
+    def __init__(self, session_id: str, model_name: str = "openai/gpt-oss-120b"):
         super().__init__(session_id)
         self.api_key = settings.groq.TOKEN
         self.model_name = model_name
