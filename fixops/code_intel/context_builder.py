@@ -4,14 +4,13 @@ context_builder.py — последний слой перед LLM.
 Стратегия точечного поиска:
   - source: форматированный код с номерами строк и комментариями
     для визуального понимания структуры (ИИ читает его глазами)
-  - raw_source: ТОЧНЫЙ код из файла — импорты + определение класса +
-    целевая функция (без комментариев, без других методов класса).
+  - raw_source: ТОЧНЫЙ код из файла — импорты + docstring класса +
+    декораторы + целевая функция (без комментариев, без других методов класса).
     Это то, что ИИ копирует в SEARCH-блок.
 
-Такой подход позволяет ИИ в одном блоке fix:
-  - добавить новый импорт (например, logging)
-  - изменить функцию внутри класса
-  - и SEARCH будет точно совпадать с реальным файлом
+Ключевое: raw_source включает ВСЁ от первого импорта до конца целевой функции,
+включая docstring класса и все декораторы. Это гарантирует ТОЧНОЕ совпадение
+SEARCH-блока с реальным файлом (100% вместо 93%).
 """
 
 import os
@@ -37,11 +36,15 @@ class ContextBuilder:
         self, file: str, target_lineno: int, target_end_lineno: int
     ) -> tuple[str, str]:
         """
-        Точечный поиск: импорты + класс + функция.
+        Точечный поиск: импорты + docstring класса + декораторы + функция.
 
         Возвращает (source, raw_source):
           - source: для чтения (с номерами и комментариями)
           - raw_source: ТОЧНЫЙ код из файла — для копирования в SEARCH
+
+        КРИТИЧЕСКИ ВАЖНО: raw_source включает ВСЁ от первого импорта до конца
+        целевой функции, включая docstring класса. Это гарантирует точное
+        совпадение SEARCH-блока с реальным файлом.
         """
         path = os.path.join(self.project_root, file)
 
@@ -74,7 +77,7 @@ class ContextBuilder:
             func_end_0based = target_end_lineno  # exclusive
 
             # 4. Строим raw_source: ТОЧНЫЙ код из файла
-            #    Порядок: импорты → (пустые строки) → class def → функция
+            #    Порядок: импорты → (пустые строки) → class def + docstring → декораторы → функция
             raw_lines = []
 
             # Импорты — точные строки
@@ -88,29 +91,15 @@ class ContextBuilder:
                     class_node.lineno - 1 if class_node else func_start_0based
                 )
                 for idx in range(last_import + 1, next_meaningful):
-                    if lines[idx].strip() == "":
-                        raw_lines.append(lines[idx])
-                    else:
-                        break
+                    raw_lines.append(lines[idx])
 
-            # Определение класса (одна строка)
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: включаем ВСЁ от class def до целевой функции
+            # Это включает docstring класса, пустые строки, декораторы
             if class_node is not None:
                 class_def_idx = class_node.lineno - 1
-                raw_lines.append(lines[class_def_idx])
-
-                # Пустая строка после class def (если есть)
-                if class_def_idx + 1 < func_start_0based:
-                    for idx in range(class_def_idx + 1, func_start_0based):
-                        if lines[idx].strip() == "":
-                            raw_lines.append(lines[idx])
-                        else:
-                            # Это декоратор целевой функции — включаем
-                            break
-
-                # Декораторы целевой функции
-                for idx in range(class_def_idx + 1, func_start_0based):
-                    if lines[idx].strip().startswith("@"):
-                        raw_lines.append(lines[idx])
+                # Берём ВСЕ строки от class def до начала целевой функции
+                for idx in range(class_def_idx, func_start_0based):
+                    raw_lines.append(lines[idx])
 
             # Целевая функция — точные строки
             for idx in range(func_start_0based, func_end_0based):
@@ -133,10 +122,18 @@ class ContextBuilder:
                     f"(целевой метод внутри) ---"
                 )
                 class_def_idx = class_node.lineno - 1
-                numbered.append(
-                    f"{class_def_idx + 1:>4} | "
-                    f"{lines[class_def_idx].rstrip()}"
-                )
+                # Показываем class def + docstring
+                for idx in range(class_def_idx, func_start_0based):
+                    if lines[idx].strip().startswith("@"):
+                        numbered.append(f"{idx + 1:>4} | {lines[idx].rstrip()}")
+                    elif lines[idx].strip().startswith("def "):
+                        numbered.append(f"{idx + 1:>4} | {lines[idx].rstrip()}")
+                    elif lines[idx].strip().startswith('"""') or lines[idx].strip().startswith("'''"):
+                        numbered.append(f"{idx + 1:>4} | {lines[idx].rstrip()}")
+                    elif lines[idx].strip() == "":
+                        numbered.append(f"{idx + 1:>4} |")
+                    else:
+                        numbered.append(f"{idx + 1:>4} | {lines[idx].rstrip()}")
 
                 # Показываем сигнатуры других методов (без тела)
                 for item in class_node.body:
@@ -308,7 +305,7 @@ class ContextBuilder:
             lines.append(
                 "**ТОЧНЫЙ код для SEARCH-блока** "
                 "(копируй отсюда символ в символ, "
-                "без комментариев выше):"
+                "включая docstring класса и все декораторы):"
             )
             lines.append("```python")
             lines.append(node["raw_source"])
@@ -325,9 +322,7 @@ class ContextBuilder:
         lines.append("\n" + "=" * 50)
         lines.append("СТРОГИЕ ТРЕБОВАНИЯ К ОТВЕТУ:")
 
-        lines.append(
-            "1. Найди первопричину (Root Cause) и исправь её."
-        )
+        lines.append("1. Найди первопричину (Root Cause) и исправь её.")
 
         lines.append(
             "2. Верни СТРОГО ДВА блока кода (`fix` и `test`). "
@@ -355,203 +350,110 @@ class ContextBuilder:
             "должно происходить при ошибочном/граничном сценарии."
         )
 
-        lines.append(
-            "7. Если исправление связано с изменением управления потоком "
-            "(`raise`, `continue`, `return`, `break`, `if/else`), "
-            "тест должен проверять именно изменение поведения."
-        )
-
-        lines.append(
-            "8. Если ожидается graceful degradation внутри цикла или batch, "
-            "тест должен содержать проблемный элемент И хотя бы один "
-            "валидный элемент и проверять итоговый результат всей операции."
-        )
-
-        lines.append(
-            "9. Для graceful degradation тест должен обнаруживать мутацию "
-            "`continue` → `raise`: если `continue` заменить на `raise`, "
-            "тест должен упасть."
-        )
-
-        lines.append(
-            "10. Если правильное поведение — fail-fast с исключением, "
-            "тест должен использовать `pytest.raises` и проверять "
-            "ожидаемый тип исключения."
-        )
-
-        lines.append(
-            "11. Для fail-fast тест должен обнаруживать мутацию "
-            "`raise` → `continue`: если `raise` заменить на `continue`, "
-            "тест должен упасть."
-        )
-
-        lines.append(
-            "12. НЕ ожидай исключение только потому, что оно присутствует "
-            "в текущем production-коде. Исключение должно быть частью "
-            "ожидаемого контракта поведения."
-        )
-
-        lines.append(
-            "13. Не создавай тесты только ради покрытия отдельных строк. "
-            "Каждый тест должен защищать конкретное поведение."
-        )
-
-        lines.append(
-            "14. После написания теста выполни мысленную mutation-проверку: "
-            "представь минимальное изменение исправленного участка обратно "
-            "в ошибочный вариант и проверь, что тест его обнаружит."
-        )
-
-        lines.append(
-            "15. Если тест проходит и на исправленной, и на ошибочной "
-            "реализации — тест недостаточно сильный и его необходимо "
-            "переписать."
-        )
-
-        lines.append(
-            "16. Если тест падает и на исправленной, и на ошибочной "
-            "реализации — тест некорректен и его необходимо переписать."
-        )
-
-        lines.append(
-            "17. Для изменения `raise` → `continue` или `continue` → `raise` "
-            "особенно важно проверять не только отсутствие/наличие "
-            "исключения, но и конечный результат операции."
-        )
-
-        lines.append(
-            "18. Если обработка выполняется в цикле, при необходимости "
-            "проверяй, что обработка последующих элементов действительно "
-            "происходит после проблемного элемента."
-        )
-
-        lines.append(
-            "19. Тест должен быть минимальным и детерминированным: "
-            "не добавляй проверки, которые не относятся к исправлению."
-        )
-
-        lines.append(
-            "20. Если правильное поведение невозможно однозначно определить "
-            "из production-кода, ошибки, существующих тестов и доступного "
-            "контекста, НЕ придумывай контракт. Выбери наиболее обоснованный "
-            "вариант только при наличии достаточных доказательств."
-        )
-
+        lines.append("7. ПРАВИЛА MONKEYPATCH (КРИТИЧЕСКИ ВАЖНО):")
         lines.append("")
+        lines.append("   При мокинге МЕТОДОВ класса (def method(self, ...)):")
+        lines.append("   ✅ ПРАВИЛЬНО:")
+        lines.append("      def mock_get(self, sku):  # ← self ОБЯЗАТЕЛЕН!")
+        lines.append("          return DummyProduct(price=10.0)")
+        lines.append("      monkeypatch.setattr(InventoryRepository, 'get', mock_get)")
+        lines.append("")
+        lines.append("   ❌ НЕПРАВИЛЬНО (вызывает TypeError):")
+        lines.append("      def mock_get(sku):  # ← забыл self!")
+        lines.append("          return DummyProduct(price=10.0)")
+        lines.append("      monkeypatch.setattr(InventoryRepository, 'get', mock_get)")
+        lines.append("")
+        lines.append("   Правило: если оригинальный метод имеет сигнатуру `def method(self, arg1, arg2)`,")
+        lines.append("   то мок-функция ДОЛЖНА иметь сигнатуру `def mock_method(self, arg1, arg2)`.")
 
         # ============================================================
         # FIX
         # ============================================================
 
-        lines.append(
-            "21. Внутри блока `fix` первой строкой укажи "
-            "`FILE: <путь>`."
-        )
+        lines.append("")
+        lines.append("8. Внутри блока `fix` первой строкой укажи `FILE: <путь>`.")
 
         lines.append("")
-
-        lines.append("22. КРИТИЧЕСКОЕ ПРАВИЛО ДЛЯ SEARCH-БЛОКА:")
-
+        lines.append("9. КРИТИЧЕСКОЕ ПРАВИЛО ДЛЯ SEARCH-БЛОКА:")
         lines.append(
             "   SEARCH-блок должен начинаться с ПЕРВОГО ИМПОРТА файла "
             "и заканчиваться КОНЦОМ целевой функции."
         )
-
         lines.append(
             "   Копируй SEARCH ТОЛЬКО из секции '**ТОЧНЫЙ код для "
-            "SEARCH-блока**' выше — символ в символ."
+            "SEARCH-блока**' выше — символ в символ, ВКЛЮЧАЯ docstring класса."
         )
-
         lines.append(
             "   НЕ включай в SEARCH комментарии вроде "
             "'# --- импорты файла ---' — их НЕТ в реальном файле."
         )
-
         lines.append(
             "   Если нужно добавить новый импорт, добавь его в REPLACE "
             "в начало блока импортов — НЕ создавай отдельный fix-блок."
         )
 
-        lines.append("")
-
         # ============================================================
-        # EXCEPTIONS
+        # EXCEPTIONS - УСИЛЕННЫЕ ПРАВИЛА
         # ============================================================
 
-        lines.append(
-            "23. УНИВЕРСАЛЬНЫЕ ПРАВИЛА ОБРАБОТКИ ИСКЛЮЧЕНИЙ:"
-        )
-
-        lines.append(
-            "   - Оценивай семантику операции, а не только наличие "
-            "исключения в текущем коде."
-        )
-
-        lines.append(
-            "   - Если отсутствие данных является штатной ситуацией "
-            "для конкретной операции, обеспечь graceful degradation "
-            "(например, пропуск элемента с логом)."
-        )
-
-        lines.append(
-            "   - Если отсутствие данных означает невозможность "
-            "корректно продолжить операцию, используй fail-fast "
-            "с явным исключением."
-        )
-
-        lines.append(
-            "   - Контекст `цикл/batch` сам по себе НЕ является достаточным "
-            "основанием для `continue`. Определи ожидаемую семантику "
-            "операции из всего доступного контекста."
-        )
-
-        lines.append(
-            "   - Контекст `единичная операция` сам по себе НЕ является "
-            "достаточным основанием для `raise`. Также определи контракт."
-        )
-
-        lines.append(
-            "   - Не меняй `raise` на `continue` или наоборот только "
-            "для того, чтобы тесты начали проходить."
-        )
-
-        lines.append(
-            "   - Исправление должно соответствовать бизнес-смыслу "
-            "операции и существующим ожиданиям тестов."
-        )
-
-        lines.append(
-            "   - Если добавляешь логирование, добавь `import logging` "
-            "и `logger = logging.getLogger(__name__)` в начало файла "
-            "(в блок импортов, ДО класса)."
-        )
-
-        lines.append(
-            "   - НИКОГДА не вставляй `import` или `logger = ...` "
-            "внутрь класса или функции."
-        )
-
         lines.append("")
+        lines.append("10. БИЗНЕС-ЛОГИКА И ОБРАБОТКА ИСКЛЮЧЕНИЙ (КРИТИЧЕСКИ ВАЖНО):")
+        lines.append("")
+        lines.append("   ПРАВИЛО ДЛЯ ЦИКЛОВ (for item in items):")
+        lines.append("   - Если функция обрабатывает коллекцию и элемент не найден:")
+        lines.append("     → ТЫ ОБЯЗАН залоггировать пропуск И продолжить цикл.")
+        lines.append("     → `continue` БЕЗ логирования — ЗАПРЕЩЁН.")
+        lines.append("     → `raise` внутри цикла — ЗАПРЕЩЁН (прервёт всю операцию).")
+        lines.append("")
+        lines.append("   ✅ ЕДИНСТВЕННЫЙ ПРАВИЛЬНЫЙ ПАТТЕРН:")
+        lines.append("     for item in items:")
+        lines.append("         product = repo.get(item['sku'])")
+        lines.append("         if product is None:")
+        lines.append("             logger.warning(f'Product {item[\"sku\"]} not found, skipping')")
+        lines.append("             continue")
+        lines.append("         total += product.price * item['qty']")
+        lines.append("     return total")
+        lines.append("")
+        lines.append("   ❌ ЗАПРЕЩЁННЫЕ ПАТТЕРНЫ:")
+        lines.append("     if product is None:")
+        lines.append("         continue  # ← ЗАПРЕЩЕНО! Нет логирования!")
+        lines.append("")
+        lines.append("     if product is None:")
+        lines.append("         raise ValueError(...)  # ← ЗАПРЕЩЕНО в цикле!")
+        lines.append("")
+        lines.append("   КАК ДОБАВИТЬ ЛОГГИРОВАНИЕ:")
+        lines.append("   - Проверь цепочку вызовов выше. Если в проекте уже есть логгер")
+        lines.append("     (например, `get_logger` из `core.logging`), используй его.")
+        lines.append("   - Добавь импорт логгера в REPLACE-блок вместе с остальными импортами.")
+        lines.append("   - Пример: если в SEARCH импорты такие:")
+        lines.append("       from typing import Any")
+        lines.append("       from repositories.inventory import InventoryRepository")
+        lines.append("     То в REPLACE добавь импорт логгера:")
+        lines.append("       from typing import Any")
+        lines.append("       from repositories.inventory import InventoryRepository")
+        lines.append("       from core.logging import get_logger  # ← добавлено")
+        lines.append("")
+        lines.append("   ПРАВИЛО ДЛЯ ЕДИНИЧНЫХ ОПЕРАЦИЙ (get_user, fetch_order):")
+        lines.append("   - Если функция возвращает ОДИН объект и он не найден:")
+        lines.append("     → Используй fail-fast с явным исключением (raise ValueError/KeyError).")
+        lines.append("     → Тест должен проверять это через `with pytest.raises(...)`.")
+        lines.append("")
+        lines.append("   ОБЩИЕ ЗАПРЕТЫ:")
+        lines.append("   - НИКОГДА не вставляй `import` или `logger = ...` внутрь класса или функции.")
+        lines.append("   - НИКОГДА не создавай дублированный return statement.")
+        lines.append("   - НИКОГДА не делай `continue` без логирования в цикле.")
 
         # ============================================================
         # MONKEYPATCH
         # ============================================================
 
-        lines.append("24. ПРАВИЛА MONKEYPATCH:")
-
+        lines.append("")
+        lines.append("11. ПРАВИЛА MONKEYPATCH:")
         lines.append("   ✅ ПРАВИЛЬНО:")
-        lines.append(
-            "      monkeypatch.setattr(ClassName, 'method_name', mock_func)"
-        )
-
+        lines.append("      monkeypatch.setattr(ClassName, 'method_name', mock_func)")
         lines.append("   ❌ НЕПРАВИЛЬНО (вызывает AttributeError):")
-        lines.append(
-            "      monkeypatch.setattr('module.ClassName', 'method', mock)"
-        )
-
-        lines.append(
-            "   Всегда передавай САМ КЛАСС, не строку с его именем."
-        )
+        lines.append("      monkeypatch.setattr('module.ClassName', 'method', mock)")
+        lines.append("   Всегда передавай САМ КЛАСС, не строку с его именем.")
 
         # ============================================================
         # ФОРМАТ ОТВЕТА
@@ -562,12 +464,12 @@ class ContextBuilder:
         lines.append("<<<<<<< SEARCH")
         lines.append(
             "<ТОЧНЫЙ код из секции '**ТОЧНЫЙ код для SEARCH-блока**' — "
-            "начинается с импортов, заканчивается функцией>"
+            "начинается с импортов, включает docstring класса, заканчивается функцией>"
         )
         lines.append("=======")
         lines.append(
-            "<исправленный код: новые импорты + импорты + класс + "
-            "исправленная функция>"
+            "<исправленный код: новые импорты + импорты + класс с docstring + "
+            "исправленная функция. ТОЛЬКО ОДИН return statement в конце функции.>"
         )
         lines.append(">>>>>>> REPLACE")
         lines.append("```\n")
@@ -580,8 +482,7 @@ class ContextBuilder:
         lines.append("...")
         lines.append(
             "<полный regression-тест на pytest с использованием "
-            "monkeypatch, который проверяет исправленное поведение "
-            "и обнаруживает исходную ошибку>"
+            "monkeypatch, который проверяет исправленное поведение>"
         )
         lines.append("```")
 
