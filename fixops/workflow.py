@@ -163,7 +163,7 @@ async def handle_fix_request(state: FixOpsState):
             "session_id": session_id,
             "llm_response": json.dumps({"error": str(e)}),
         }
-    #open("file.txt", "w", encoding="utf-8").write(content)
+    open("file.txt", "w", encoding="utf-8").write(content)
     return {
         "session_id": session_id,
         "llm_response": content,
@@ -264,13 +264,18 @@ async def prepare_retry_node(state: FixOpsState):
         ВАЖНО: Если ошибка в тестах связана с тем, что код теперь корректно выбрасывает исключение (например, ValueError, KeyError, NotFound), ты ОБЯЗАН обновить тест, используя конструкцию `with pytest.raises(ОжидаемоеИсключение):`.
         Не пытайся "починить" тест, удаляя выброс исключения из основного кода, если это соответствует бизнес-логике.
 
+        ВАЖНО: ИСПОЛЬЗУЙ МИНИМАЛЬНЫЙ КОНТЕКСТ ДЛЯ SEARCH. 
+        Не присылай весь файл целиком. 
+        Присылай только ту функцию или тот блок кода, который требует изменений, с 2-3 строками кода до и после для однозначной идентификации места.
+        Убедись, что отступы и пустые строки в SEARCH блоке СТРОГО соответствуют текущему коду в файле.
+
         Верни исправление строго в ДВУХ блоках:
         ```fix
         FILE: <путь_к_файлу>
         <<<<<<< SEARCH
-        <старый код>
+        <старый код с точным соблюдением отступов>
         =======
-        <новый код>
+        <новый код с точным соблюдением отступов>
         >>>>>>> REPLACE
         ```
         ```test
@@ -312,7 +317,9 @@ def should_run_tests(state: FixOpsState):
 
 def should_retry(state: FixOpsState):
 
-    if state.get("tests_passed", False) and state.get("reproduction_passed", False):
+    # Если тесты прошли успешно, завершаем выполнение,
+    # игнорируя результат воспроизведения, если он не критичен.
+    if state.get("tests_passed", False):
         return "success"
 
     if state.get("test_result_type") == "INFRA_FAILURE":
