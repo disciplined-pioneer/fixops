@@ -94,6 +94,12 @@ class FixExecutor:
         env = os.environ.copy()
         env["PYTHONPATH"] = f"{self.project_root};{self.project_root.parent}"
 
+        # ИЗОЛЯЦИЯ ЛОГОВ:
+        # Устанавливаем LOG_DIR для дочернего процесса на папку логов проекта
+        env["LOG_DIR"] = str(self.project_root / "logs")
+        # Если sample_app использует APP_LOG_DIR, переопределяем и его
+        env["APP_LOG_DIR"] = str(self.project_root / "logs")
+
         process = subprocess.run(
             command,
             cwd=self.project_root,
