@@ -2,7 +2,7 @@ import inspect
 import time
 from functools import wraps
 
-from sample_app.core.logging import get_logger
+from core.logging import get_logger
 
 
 SENSITIVE_FIELDS = {

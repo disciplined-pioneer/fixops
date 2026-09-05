@@ -91,7 +91,6 @@ class ErrorLoader:
         raise ValueError(
             f"В последних {tail} строках лога {path} не найдено ERROR-записи "
             f"с координатами ошибки ({', '.join(settings.analysis.REQUIRED_ERROR_KEYS)}). "
-            f"Запустите python sample_app/reproduce.py или увеличьте LOG_TAIL_LINES"
         )
 
 
@@ -186,13 +185,14 @@ class AnalyzeJob:
 
 async def main() -> int:
 
-    project_path = "sample_app"
+    project_path = "generator_report"
 
     base_dir = Path(__file__).resolve().parent.parent
     project_root = str(base_dir / project_path)
 
     error_log_path = os.path.join(project_root, "logs", "app.log")
-    logs_dir = os.path.join(project_root, ".fixops")
+    logs_dir = os.path.join(project_root, ".fixops") # Теперь логи будут в generator_report/.fixops
+
 
     if not os.path.isdir(project_root):
         sys.stderr.write(f"Не найдена папка проекта: {project_root}\n")
