@@ -146,7 +146,6 @@ async def context_builder_node(state: FixOpsState):
     }
 
 
-
 # Отправляет prompt в LLM
 @log_execution(event="workflow_step", operation="llm")
 async def handle_fix_request(state: FixOpsState):
