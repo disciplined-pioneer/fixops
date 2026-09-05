@@ -185,7 +185,7 @@ class AnalyzeJob:
 
 async def main() -> int:
 
-    project_path = "sample_app"
+    project_path = "generator_report"
 
     base_dir = Path(__file__).resolve().parent.parent
     project_root = str(base_dir / project_path)
