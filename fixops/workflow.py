@@ -164,7 +164,7 @@ async def handle_fix_request(state: FixOpsState):
             "session_id": session_id,
             "llm_response": json.dumps({"error": str(e)}),
         }
-
+    open("file.txt", "w", encoding="utf-8").write(content)
     return {
         "session_id": session_id,
         "llm_response": content,
