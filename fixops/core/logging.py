@@ -11,14 +11,6 @@ from typing import Any, cast
 from loguru import logger
 from config import settings, _REPO_ROOT
 
-# Исправление 1: Принудительный UTF-8 для stdout/stderr на Windows
-# Cast к Any убирает ошибку "Cannot access attribute reconfigure for class TextIO"
-if sys.platform == "win32":
-    if hasattr(sys.stdout, "reconfigure"):
-        cast(Any, sys.stdout).reconfigure(encoding="utf-8")
-    if hasattr(sys.stderr, "reconfigure"):
-        cast(Any, sys.stderr).reconfigure(encoding="utf-8")
-
 # Директория логов: по умолчанию <корень проекта>/logs
 LOGS_DIR = Path(settings.logging.LOG_DIR)
 if not LOGS_DIR.is_absolute():
